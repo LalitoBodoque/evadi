@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#E6F1FB">
+<title>EvaDí</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icono-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{--fondo:#E6F1FB;--borde-fondo:#85B7EB;--blanco:#FFFFFF;--texto:#1F1F1D;--texto2:#5F5E5A;--ok-bg:#C0DD97;--ok-tx:#173404;--ok-bd:#639922;--pe-bg:#FAC775;--pe-tx:#412402;--pe-bd:#BA7517;--ko-bg:#F7C1C1;--ko-tx:#501313;--ko-bd:#E24B4A;--azul:#185FA5;--radio:8px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--fondo);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font-family:inherit;color:inherit}
+#app{position:relative;max-width:420px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;gap:7px;padding:10px 12px 16px}
+.ok{background:var(--ok-bg);color:var(--ok-tx);border:1.5px solid var(--ok-bd)}
+.pe{background:var(--pe-bg);color:var(--pe-tx);border:1.5px solid var(--pe-bd)}
+.ko{background:var(--ko-bg);color:var(--ko-tx);border:1.5px solid var(--ko-bd)}
+.sm{font-size:12px}
+.ttl{text-align:center;font-size:14px;font-weight:600}
+.tl{border-radius:var(--radio);padding:6px 8px}
+.ce{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cab{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.ley{display:flex;gap:6px;color:var(--texto2)}
+.ley i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:2px}
+.recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer}
+.tx{border:none;background:transparent;padding:0 4px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.hb{display:flex;align-items:center;justify-content:space-between;border-radius:var(--radio);padding:0 8px;height:48px}
+.cb{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border:2px solid var(--texto);border-radius:5px;background:var(--blanco);display:grid;place-content:center;cursor:pointer;padding:0;flex:none}
+.cb.h:checked::after{content:"✓";font-size:16px;line-height:1;font-weight:700;color:var(--ok-tx)}
+.cb.f:checked::after{content:"✕";font-size:15px;line-height:1;font-weight:700;color:var(--ko-tx)}
+.hueco{width:24px;height:24px;flex:none}
+.ic{border:none;background:transparent;padding:0 6px;height:40px;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center}
+.bb{font-size:13px;line-height:1.15;padding:2px 4px;height:40px;white-space:normal;text-align:center;background:var(--blanco);border:1px solid var(--borde-fondo);border-radius:var(--radio);cursor:pointer}
+.bb:disabled{opacity:.5;cursor:default}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;text-align:center}
+#rac{width:100%;height:36px;border:1px solid var(--borde-fondo);border-radius:var(--radio);padding:0 10px;font-size:15px;background:var(--blanco)}
+#estado{min-height:15px;text-align:center}
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px;z-index:10}
+.dlg{background:var(--blanco);border-radius:12px;padding:16px 18px;width:100%;max-width:400px;max-height:85vh;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.dt{font-size:18px;font-weight:600}
+.dd{font-size:15px;line-height:1.55;color:var(--texto2)}
+.db{font-size:15px;height:44px;padding:0 12px;background:var(--blanco);border:1px solid #B4B2A9;border-radius:var(--radio);cursor:pointer}
+.pri{background:var(--azul);color:#FFFFFF;border:none}
+.x{border:none;background:transparent;font-size:20px;cursor:pointer;padding:0 4px}
+.hm{display:flex;align-items:flex-end;gap:8px}
+.hm label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--texto2)}
+.hm input{width:80px;height:44px;font-size:18px;text-align:center;border:1px solid #B4B2A9;border-radius:var(--radio)}
+select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--radio);background:var(--blanco);padding:0 8px}
+#cargando{text-align:center;padding:40px 0;color:var(--texto2)}
+#contenido.viejo{opacity:.6}
+.etq{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--texto2)}
+.campo{width:100%;height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--radio);padding:0 10px;background:var(--blanco);color:var(--texto)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="cab">
+    <span id="titulo" style="font-size:19px;font-weight:600">EvaDí <span id="fecha" style="font-size:15px;font-weight:500"></span></span>
+    <span class="sm ley"><span><i class="pe"></i>Pend.</span><span><i class="ok"></i>Hecho</span><span><i class="ko"></i>Fallé</span></span>
+    <button class="recarga" id="recargar" aria-label="Recargar">↻</button>
+  </div>
+  <div id="nueva" class="tl pe" style="display:none;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px 6px 12px">
+    <span style="font-size:14px;font-weight:600">Hay versión nueva</span>
+    <button class="bb" id="actualizar" style="padding:0 14px">Actualizar</button>
+  </div>
+  <div id="cargando">Cargando…</div>
+  <div id="contenido" style="display:none;flex-direction:column;gap:7px">
+    <div class="ok" id="sbox" style="border-radius:var(--radio);padding:8px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px">
+      <div style="justify-self:start;text-align:left;line-height:1.25"><span style="display:block;font-size:13px">Racha actual</span><span id="ract" style="display:block;font-size:15px;font-weight:600"></span></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style="font-size:17px;font-weight:700">Sobriedad</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px"><input id="tome" type="checkbox"> Hoy tomé</label>
+      </div>
+      <div style="justify-self:end;text-align:right;line-height:1.25"><span style="display:block;font-size:13px">Mejor racha</span><span id="rmej" style="display:block;font-size:15px;font-weight:600"></span></div>
+    </div>
+    <div class="tl pe" id="tbox" style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;padding:8px 12px">
+      <button class="tx" id="bmeta" style="justify-self:start;text-align:left;padding:0;line-height:1.25" aria-label="Cambiar meta de tiempo"><span style="display:block;font-size:13px">Meta</span><span id="mval" style="display:block;font-size:15px;font-weight:600"></span></button>
+      <div style="display:flex;flex-direction:column;align-items:center;line-height:1.15">
+        <span style="font-size:13px">Tiempo hoy</span>
+        <button class="tx" id="tval" style="font-size:28px;font-weight:700;line-height:1.1" aria-label="Cambiar tiempo de hoy"></button>
+      </div>
+      <div style="justify-self:end;text-align:right;line-height:1.25"><span id="tfal" style="display:block;font-size:13px"></span><span id="tdif" style="display:block;font-size:15px;font-weight:600"></span></div>
+    </div>
+    <div class="ttl">Hábitos de hoy</div>
+    <div id="habs" class="grid2" style="gap:5px"></div>
+    <div class="ttl">Meta de todos: ≥ 90 %</div>
+    <div class="grid4">
+      <div class="tl" id="m1" style="padding:4px"><div class="sm">Háb. mes</div><div style="font-size:16px;font-weight:600"></div></div>
+      <div class="tl" id="m2" style="padding:4px"><div class="sm">Tiem. mes</div><div style="font-size:16px;font-weight:600"></div></div>
+      <div class="tl" id="m3" style="padding:4px"><div class="sm">Mensual</div><div style="font-size:16px;font-weight:600"></div></div>
+      <div class="tl" id="m4" style="padding:4px"><div class="sm">Global</div><div style="font-size:16px;font-weight:600"></div></div>
+    </div>
+    <div class="grid3">
+      <button class="bb" data-boton="check">Check hábitos</button>
+      <button class="bb" data-boton="tiempoHoy">Tiempo hoy</button>
+      <button class="bb" data-boton="evaluar">Evaluar</button>
+      <button class="bb" data-boton="ejercicio">Ejercicio</button>
+      <button class="bb" data-boton="tiempoManana">Tiempo mañana</button>
+      <button class="bb" data-boton="exentar">Exentar</button>
+    </div>
+    <input id="rac" type="text" aria-label="Relevante, agradecer y chistoso" placeholder="Relevante, agradecer y chistoso">
+  </div>
+  <div id="estado" class="sm"></div>
+</div>
+
+<div id="pop" class="ov">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="ptit">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div id="ptit" class="dt"></div>
+      <button class="x" data-cerrar="pop" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="pcel" style="font-size:13px;color:var(--texto2)"></div>
+    <select id="psel" aria-label="Cambiar opción" style="display:none"></select>
+    <div style="font-size:16px;font-weight:600">Notas</div>
+    <div id="pnot" style="font-size:16px;white-space:pre-line;line-height:1.55"></div>
+  </div>
+</div>
+
+<div id="conf" class="ov">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="ctit" style="text-align:center">
+    <div id="ctit" class="dt"></div>
+    <div id="cdes" class="dd"></div>
+    <div class="grid2" style="gap:8px;margin-top:4px">
+      <button class="db" data-cerrar="conf">Cancelar</button>
+      <button class="db pri" id="cok"></button>
+    </div>
+  </div>
+</div>
+
+<div id="hmp" class="ov">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="htit">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div id="htit" class="dt"></div>
+      <button class="x" data-cerrar="hmp" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="hm"><label>Horas<input id="hh" type="number" min="0" max="23" step="1" inputmode="numeric"></label><span style="font-size:22px;padding-bottom:8px">:</span><label>Minutos<input id="hmm" type="number" min="0" max="59" step="5" inputmode="numeric"></label></div>
+    <div id="herr" style="font-size:14px;color:var(--ko-tx);display:none"></div>
+    <button class="db pri" id="hok"></button>
+  </div>
+</div>
+
+<div id="clv" class="ov">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="ktit">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div id="ktit" class="dt">Conectar con tu hoja</div>
+      <button class="x" data-cerrar="clv" aria-label="Cerrar">✕</button>
+    </div>
+    <label class="etq">URL de la app web (termina en /exec)<input id="kurl" class="campo" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label class="etq">Clave<input id="kcla" class="campo" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <div id="kerr" style="font-size:14px;color:var(--ko-tx);display:none"></div>
+    <button class="db pri" id="kok">Guardar</button>
+  </div>
+</div>
+
+<script>
+/* ==================== ESTADO GENERAL ==================== */
+
+var E = null;                 // lo que se ve en pantalla (hoja + cambios pendientes ya aplicados)
+var enVuelo = false;          // hay una petición a Apps Script en camino
+var sinSenal = navigator.onLine === false;
+var otraVez = false;          // se pidió sincronizar mientras otra iba en camino
+var ultimoTxt = '';           // texto a mostrar cuando se guarden los cambios
+var tSync = null;
+var modoHM = null;
+var accion = null;
+var swNuevo = null;
+var pidioActualizar = false;
+
+var CLAVE_CACHE = 'evadiApp_estado';
+var CLAVE_COLA = 'evadiApp_cola';
+var CLAVE_CONF = 'evadiApp_conf';
+
+var CONF = {
+  evaluar: { t: '¿Seguro que quieres evaluar el día?', d: 'Pasa tus hábitos, tiempo y Relevante a Cal, crea el evento de ejercicio de mañana y deja EvaDi limpio para el siguiente día.', b: 'Sí, evaluar' },
+  exentar: { t: '¿Seguro que quieres exentar el día?', d: 'Marca todos tus hábitos como hechos (menos Santa Brígida) y pone la meta de tiempo en 0.', b: 'Sí, exentar' }
+};
+
+function $(id) { return document.getElementById(id); }
+function hm(m) { m = Math.max(0, Math.round(m)); var r = m % 60; return Math.floor(m / 60) + ':' + (r < 10 ? '0' : '') + r; }
+function est(el, s) { el.classList.remove('ok', 'pe', 'ko'); el.classList.add(s); }
+function pct(x) { return Math.round(x * 100) + ' %'; }
+
+/* ==================== GUARDADO LOCAL ==================== */
+
+function leerJSON(k, porDefecto) {
+  try { var t = localStorage.getItem(k); return t ? JSON.parse(t) : porDefecto; } catch (e) { return porDefecto; }
+}
+function guardarJSON(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+}
+function leerCola() { var c = leerJSON(CLAVE_COLA, []); return Array.isArray(c) ? c : []; }
+function guardarCola(c) { guardarJSON(CLAVE_COLA, c); }
+function leerConf() { var c = leerJSON(CLAVE_CONF, null); return c && c.url && c.clave ? c : null; }
+function guardarCache(estado) { guardarJSON(CLAVE_CACHE, estado); }
+function leerCache() { return leerJSON(CLAVE_CACHE, null); }
+
+// Fecha de hoy del cel como aaaa-mm-dd
+function hoyLocal() {
+  var d = new Date(), m = d.getMonth() + 1, dd = d.getDate();
+  return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+}
+function nuevoId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+/* ==================== MENSAJES ==================== */
+
+function esError(t) { return /^Error|No se encontr|No puede|Clockify|No se guard|descart|ocupada|No lleg/.test(t || ''); }
+
+function mostrarEstado(txt, error) {
+  var e = $('estado');
+  e.textContent = txt || '';
+  e.style.color = error ? 'var(--ko-tx)' : 'var(--texto2)';
+}
+
+// Texto de fondo: sin señal y cuántos cambios esperan
+function lineaBase() {
+  var n = leerCola().length;
+  var p = n ? n + (n === 1 ? ' cambio pendiente' : ' cambios pendientes') : '';
+  if (sinSenal) return (navigator.onLine === false ? 'Sin señal' : 'Sin conexión con la hoja') + (p ? ' · ' + p : '');
+  return p;
+}
+
+/* ==================== RED ==================== */
+
+// Manda una petición a Apps Script. Rechaza con {tipo:'red'|'clave'|'servidor', msg}
+function pedir(cuerpo, ms) {
+  var conf = leerConf();
+  var ctrl = window.AbortController ? new AbortController() : null;
+  var reloj = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms);
+  cuerpo.clave = conf.clave;
+  return fetch(conf.url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // texto plano: Apps Script lo acepta sin pedir permiso extra al navegador
+    body: JSON.stringify(cuerpo),
+    redirect: 'follow',
+    cache: 'no-store',
+    signal: ctrl ? ctrl.signal : undefined
+  }).then(function (r) { return r.text(); })
+    .then(function (txt) {
+      clearTimeout(reloj);
+      var d;
+      try { d = JSON.parse(txt); } catch (e) {
+        throw { tipo: 'servidor', msg: 'Apps Script no respondió bien. Revisa que el acceso sea "Cualquiera".' };
+      }
+      if (!d || d.ok !== true) {
+        throw { tipo: d && d.error === 'clave' ? 'clave' : 'servidor', msg: (d && d.error) || 'Error en Apps Script' };
+      }
+      return d;
+    }, function () {
+      clearTimeout(reloj);
+      throw { tipo: 'red' };
+    });
+}
+
+// Junta toques rápidos en una sola petición
+function programarSync(ms) {
+  clearTimeout(tSync);
+  tSync = setTimeout(function () { sincronizar({ silencioso: true }); }, ms == null ? 400 : ms);
+}
+
+// Manda la fila de pendientes (y el botón, si hay) y pinta lo que regrese la hoja
+function sincronizar(opts) {
+  opts = opts || {};
+  clearTimeout(tSync);
+  if (!leerConf()) { abrirConf(); return; }
+  if (enVuelo) { otraVez = true; return; }
+  if (navigator.onLine === false) { marcarSinSenal(); return; }
+
+  var envio = leerCola();
+  var estabaSinSenal = sinSenal;
+  enVuelo = true;
+  pintarControles();
+  if (opts.boton) mostrarEstado('Trabajando…');
+  else if (!opts.silencioso) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
+
+  pedir({ ops: envio, boton: opts.boton || '' }, opts.boton ? 120000 : 30000).then(function (d) {
+    enVuelo = false;
+    sinSenal = false;
+
+    // Quitar de la fila lo que ya llegó; lo que se agregó mientras tanto se queda
+    var mandados = {};
+    envio.forEach(function (o) { mandados[o.id] = true; });
+    var resto = leerCola().filter(function (o) { return !mandados[o.id]; });
+    guardarCola(resto);
+
+    var nuevo = d.estado;
+    var aviso = nuevo.aviso || '';
+    resto.forEach(function (o) { aplicarLocal(nuevo, o); });
+    render(nuevo);
+
+    if (aviso) mostrarEstado(aviso, esError(aviso));
+    else if (envio.length) mostrarEstado(ultimoTxt || 'Guardado');
+    else if (!opts.silencioso || estabaSinSenal) mostrarEstado(lineaBase());
+    if (envio.length) ultimoTxt = '';
+
+    if (resto.length || otraVez) { otraVez = false; programarSync(); }
+  }, function (err) {
+    enVuelo = false;
+    otraVez = false;
+    $('contenido').classList.remove('viejo');
+
+    // Si un "total" de tiempo no llegó, se vuelve diferencia para no pisar lo que mande Clockify
+    var cola = leerCola();
+    cola.forEach(function (o) { if (o.tipo === 'tiempo' && o.modo === 'total') o.modo = 'dif'; });
+    guardarCola(cola);
+
+    if (err && err.tipo === 'clave') {
+      pintarControles();
+      abrirConf('La clave no coincide. Revísala.');
+      return;
+    }
+    if (err && err.tipo === 'servidor') {
+      pintarControles();
+      mostrarEstado(err.msg || 'Error en Apps Script', true);
+      return;
+    }
+    marcarSinSenal();
+    if (opts.boton) mostrarEstado('No llegó la respuesta. Toca ↻ para ver si se hizo.', true);
+    if (!E) $('cargando').textContent = 'No se pudo cargar. Toca ↻ para reintentar.';
+  });
+}
+
+function marcarSinSenal() {
+  sinSenal = true;
+  pintarControles();
+  mostrarEstado(lineaBase());
+}
+
+/* ==================== CAMBIOS LOCALES ==================== */
+
+// Guarda el cambio en la fila de pendientes, lo pinta al instante y avisa que hay que sincronizar
+function encolar(op, txt) {
+  if (!E) return;
+  op.id = nuevoId();
+  if (op.tipo !== 'tome') op.dia = E.dia;
+  var cola = leerCola();
+  cola.push(op);
+  guardarCola(cola);
+  ultimoTxt = txt || 'Guardado';
+  aplicarLocal(E, op);
+  render(E);
+  if (sinSenal || navigator.onLine === false) mostrarEstado(lineaBase());
+  programarSync();
+}
+
+// Hace en pantalla lo mismo que hará Apps Script con ese cambio
+function aplicarLocal(estado, op) {
+  if (!estado || !op) return;
+  if (op.tipo !== 'tome' && op.dia && estado.dia && op.dia !== estado.dia) return;
+  var h = estado.habitos ? estado.habitos[op.indice] : null;
+  switch (op.tipo) {
+    case 'marcar':
+      if (!h) return;
+      if (op.campo === 'hecho') {
+        h.hecho = op.valor === true;
+        if (h.hecho && h.tieneFalle) h.falle = false;
+      } else if (op.campo === 'falle' && h.tieneFalle) {
+        h.falle = op.valor === true;
+        if (h.falle) h.hecho = false;
+      }
+      break;
+    case 'opcion':
+      if (!h) return;
+      h.texto = String(op.texto);
+      h.emoji = h.texto.split(' ')[0] || '•';
+      h.nombre = h.texto.slice(h.emoji.length).trim();
+      break;
+    case 'rac':
+      estado.rac = op.texto;
+      break;
+    case 'meta':
+      estado.meta = op.minutos;
+      break;
+    case 'tiempo':
+      estado.tiempo = op.modo === 'total' ? op.total : Math.max(0, (estado.tiempo || 0) + op.dif);
+      break;
+    case 'tome':
+      if (op.fecha === hoyLocal()) aplicarTomeLocal(estado, op.valor === true);
+      break;
+  }
+}
+
+// Aproximación de la racha mientras no hay respuesta de la hoja
+function aplicarTomeLocal(estado, valor) {
+  var s = estado.sobriedad;
+  if (!s || s.tomeHoy === valor) return;
+  if (valor) {
+    s.previo = { dias: s.dias, actualYmd: s.actualYmd };
+    s.tomeHoy = true;
+    s.dias = 0;
+    s.actualYmd = { a: 0, m: 0, d: 0 };
+  } else {
+    s.tomeHoy = false;
+    if (s.previo) { s.dias = s.previo.dias; s.actualYmd = s.previo.actualYmd; delete s.previo; }
+  }
+}
+
+/* ==================== PINTAR ==================== */
+
+// Años y meses solo si hay; días siempre
+function ymdTexto(r) {
+  var partes = [];
+  var esp = '\u00a0'; // espacio que no se parte: el número no se separa de su unidad
+  if (r.a > 0) partes.push(r.a + esp + (r.a === 1 ? 'año' : 'años'));
+  if (r.m > 0) partes.push(r.m + esp + (r.m === 1 ? 'mes' : 'meses'));
+  partes.push(r.d + esp + (r.d === 1 ? 'día' : 'días'));
+  return partes.join(' ');
+}
+
+function pintarResumen() {
+  var tome = E.sobriedad.tomeHoy;
+
+  est($('sbox'), tome ? 'ko' : 'ok');
+  $('ract').textContent = ymdTexto(E.sobriedad.actualYmd || { a: 0, m: 0, d: E.sobriedad.dias || 0 });
+  $('rmej').textContent = ymdTexto(E.sobriedad.mejorYmd || { a: 0, m: 0, d: E.sobriedad.mejor || 0 });
+  $('tome').checked = tome;
+
+  var d = E.tiempo - E.meta;
+  $('mval').textContent = hm(E.meta);
+  $('tval').textContent = hm(E.tiempo);
+  $('tfal').textContent = d >= 0 ? 'Te sobran' : 'Te faltan';
+  $('tdif').textContent = (d >= 0 ? '+' : '−') + hm(Math.abs(d));
+  est($('tbox'), d >= 0 ? 'ok' : 'pe');
+
+  [['m1', E.mes.habitos], ['m2', E.mes.tiempo], ['m3', E.mes.total], ['m4', E.mes.global]].forEach(function (p) {
+    var el = $(p[0]);
+    el.children[1].textContent = pct(p[1]);
+    est(el, p[1] >= 0.9 ? 'ok' : 'pe');
+  });
+}
+
+function pintarHabito(fila, h) {
+  est(fila, h.hecho ? 'ok' : (h.falle ? 'ko' : 'pe'));
+}
+
+// Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
+function pintarControles() {
+  document.querySelectorAll('[data-boton]').forEach(function (b) {
+    b.disabled = enVuelo || sinSenal || !E;
+  });
+}
+
+function render(estado, deCache) {
+  E = estado;
+  $('cargando').style.display = 'none';
+  $('contenido').style.display = 'flex';
+  $('contenido').classList.toggle('viejo', !!deCache);
+  if (!deCache) guardarCache(estado);
+  $('fecha').textContent = '· ' + E.fecha.dia + ' ' + E.fecha.numero + ' de ' + String(E.fecha.mes || '').toLowerCase();
+
+  var cont = $('habs');
+  cont.innerHTML = '';
+  E.habitos.forEach(function (h) {
+    var fila = document.createElement('div');
+    fila.className = 'hb';
+
+    var ch = document.createElement('input');
+    ch.type = 'checkbox'; ch.className = 'cb h'; ch.checked = h.hecho;
+    ch.setAttribute('aria-label', h.nombre + ' hecho');
+    fila.appendChild(ch);
+
+    var ic = document.createElement('button');
+    ic.className = 'ic'; ic.textContent = h.emoji;
+    ic.setAttribute('aria-label', 'Ver ' + h.nombre);
+    ic.addEventListener('click', function () { abrirHabito(h); });
+    fila.appendChild(ic);
+
+    var cf = null;
+    if (h.tieneFalle) {
+      cf = document.createElement('input');
+      cf.type = 'checkbox'; cf.className = 'cb f'; cf.checked = h.falle;
+      cf.setAttribute('aria-label', h.nombre + ' fallé');
+      fila.appendChild(cf);
+    } else {
+      var hueco = document.createElement('span');
+      hueco.className = 'hueco';
+      fila.appendChild(hueco);
+    }
+
+    ch.addEventListener('change', function () {
+      encolar({ tipo: 'marcar', indice: h.indice, campo: 'hecho', valor: ch.checked });
+    });
+    if (cf) {
+      cf.addEventListener('change', function () {
+        encolar({ tipo: 'marcar', indice: h.indice, campo: 'falle', valor: cf.checked });
+      });
+    }
+
+    pintarHabito(fila, h);
+    cont.appendChild(fila);
+  });
+
+  if (document.activeElement !== $('rac')) $('rac').value = E.rac;
+  pintarResumen();
+  pintarControles();
+}
+
+/* ==================== VENTANAS ==================== */
+
+function abrir(id) { $(id).style.display = 'flex'; }
+function cerrar(id) { $(id).style.display = 'none'; }
+function hayVentanaAbierta() {
+  return ['pop', 'conf', 'hmp', 'clv'].some(function (id) { return $(id).style.display === 'flex'; });
+}
+
+function abrirHabito(h) {
+  $('ptit').textContent = h.texto;
+  $('pcel').textContent = 'Celda ' + h.celda + ' de EvaDi';
+  $('pnot').textContent = h.nota || 'Sin notas.';
+  var sel = $('psel');
+  sel.innerHTML = '';
+  if (h.opciones && h.opciones.length) {
+    h.opciones.forEach(function (o) {
+      var op = document.createElement('option');
+      op.value = o; op.textContent = o;
+      if (o === h.texto) op.selected = true;
+      sel.appendChild(op);
+    });
+    sel.style.display = 'block';
+    sel.onchange = function () {
+      cerrar('pop');
+      encolar({ tipo: 'opcion', indice: h.indice, texto: sel.value }, 'Opción cambiada');
+    };
+  } else {
+    sel.style.display = 'none';
+    sel.onchange = null;
+  }
+  abrir('pop');
+}
+
+function abrirHM(modo) {
+  modoHM = modo;
+  var v = modo === 'meta' ? E.meta : E.tiempo;
+  $('htit').textContent = modo === 'meta' ? 'Meta de tiempo de hoy' : 'Tiempo de hoy';
+  $('hok').textContent = modo === 'meta' ? 'Guardar meta' : 'Guardar tiempo';
+  $('hh').value = Math.floor(v / 60);
+  $('hmm').value = v % 60;
+  $('herr').style.display = 'none';
+  abrir('hmp');
+}
+
+function guardarHM() {
+  var h = $('hh').value, m = $('hmm').value;
+  h = h === '' ? 0 : Math.round(Number(h));
+  m = m === '' ? 0 : Math.round(Number(m));
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+    $('herr').textContent = 'Escribe un tiempo válido (horas de 0 a 23, minutos de 0 a 59)';
+    $('herr').style.display = 'block';
+    return;
+  }
+  var total = h * 60 + m;
+  cerrar('hmp');
+  if (modoHM === 'meta') {
+    encolar({ tipo: 'meta', minutos: total }, 'Meta cambiada a ' + hm(total));
+    return;
+  }
+  var dif = total - E.tiempo;
+  if (dif === 0) return;
+  // Con señal y sin pendientes: se manda el total. Si no: se guarda la diferencia (+/-)
+  var directo = !sinSenal && !enVuelo && navigator.onLine !== false && leerCola().length === 0;
+  encolar({ tipo: 'tiempo', modo: directo ? 'total' : 'dif', total: total, dif: dif }, 'Tiempo guardado');
+}
+
+function pedirBoton(nombre) {
+  if (enVuelo || sinSenal || !E) return;
+  if (CONF[nombre]) {
+    accion = nombre;
+    $('ctit').textContent = CONF[nombre].t;
+    $('cdes').textContent = CONF[nombre].d;
+    $('cok').textContent = CONF[nombre].b;
+    abrir('conf');
+  } else {
+    sincronizar({ boton: nombre });
+  }
+}
+
+function abrirConf(msg) {
+  var c = leerConf() || {};
+  $('kurl').value = c.url || '';
+  $('kcla').value = c.clave || '';
+  $('kerr').textContent = msg || '';
+  $('kerr').style.display = msg ? 'block' : 'none';
+  abrir('clv');
+}
+
+function guardarConf() {
+  var url = $('kurl').value.trim();
+  var clave = $('kcla').value.trim();
+  var error = '';
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) error = 'Pega la URL de la implementación, la que termina en /exec.';
+  else if (!clave) error = 'Falta la clave.';
+  if (error) {
+    $('kerr').textContent = error;
+    $('kerr').style.display = 'block';
+    return;
+  }
+  guardarJSON(CLAVE_CONF, { url: url, clave: clave });
+  cerrar('clv');
+  sinSenal = false;
+  sincronizar();
+}
+
+/* ==================== EVENTOS ==================== */
+
+$('recargar').addEventListener('click', function () { if (!enVuelo) sincronizar(); });
+$('titulo').addEventListener('click', function () { abrirConf(); });
+$('tome').addEventListener('change', function () {
+  encolar({ tipo: 'tome', valor: $('tome').checked, fecha: hoyLocal() });
+});
+$('bmeta').addEventListener('click', function () { if (E) abrirHM('meta'); });
+$('tval').addEventListener('click', function () { if (E) abrirHM('tiempo'); });
+$('hok').addEventListener('click', guardarHM);
+$('kok').addEventListener('click', guardarConf);
+$('cok').addEventListener('click', function () {
+  cerrar('conf');
+  if (!enVuelo && !sinSenal) sincronizar({ boton: accion });
+});
+document.querySelectorAll('[data-boton]').forEach(function (b) {
+  b.addEventListener('click', function () { pedirBoton(b.getAttribute('data-boton')); });
+});
+document.querySelectorAll('[data-cerrar]').forEach(function (b) {
+  b.addEventListener('click', function () { cerrar(b.getAttribute('data-cerrar')); });
+});
+['pop', 'conf', 'hmp', 'clv'].forEach(function (id) {
+  $(id).addEventListener('click', function (e) { if (e.target.id === id) cerrar(id); });
+});
+['hh', 'hmm'].forEach(function (id) {
+  $(id).addEventListener('input', function () { $('herr').style.display = 'none'; });
+});
+$('rac').addEventListener('change', function () {
+  encolar({ tipo: 'rac', texto: $('rac').value.slice(0, 2000) });
+});
+$('rac').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('rac').blur(); });
+
+// Señal: al regresar, se manda la fila de pendientes sola
+window.addEventListener('online', function () { sincronizar({ silencioso: true }); });
+window.addEventListener('offline', marcarSinSenal);
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && !enVuelo) sincronizar({ silencioso: true });
+});
+
+// Cada 15 s: si hay pendientes o no hubo conexión, reintenta. Si todo está al día, refresca cada minuto
+// (para ver el tiempo que escribe Clockify/n8n). No interrumpe si escribes o hay una ventana abierta.
+var tic = 0;
+setInterval(function () {
+  tic++;
+  if (document.visibilityState !== 'visible' || enVuelo || hayVentanaAbierta()) return;
+  if (document.activeElement === $('rac')) return;
+  if (!leerConf()) return;
+  if (leerCola().length || sinSenal) sincronizar({ silencioso: true });
+  else if (tic % 4 === 0) sincronizar({ silencioso: true });
+}, 15000);
+
+/* ==================== VERSIÓN NUEVA ==================== */
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(function (reg) {
+    function avisar(sw) { swNuevo = sw; $('nueva').style.display = 'flex'; }
+    if (reg.waiting && navigator.serviceWorker.controller) avisar(reg.waiting);
+    reg.addEventListener('updatefound', function () {
+      var n = reg.installing;
+      if (!n) return;
+      n.addEventListener('statechange', function () {
+        if (n.state === 'installed' && navigator.serviceWorker.controller) avisar(n);
+      });
+    });
+    // Revisa si hay versión nueva cada que regresas a la app
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') reg.update().catch(function () {});
+    });
+  }).catch(function () {});
+
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!pidioActualizar) return; // la primera instalación no recarga
+    pidioActualizar = false;
+    location.reload();
+  });
+}
+$('actualizar').addEventListener('click', function () {
+  if (!swNuevo) { location.reload(); return; }
+  pidioActualizar = true;
+  swNuevo.postMessage('saltar');
+});
+
+/* ==================== ARRANQUE ==================== */
+
+// Pintar al instante lo último guardado (con pendientes ya aplicados) y luego traer lo fresco
+var guardado = leerCache();
+if (guardado && guardado.habitos) render(guardado, !sinSenal);
+if (!leerConf()) {
+  if (!guardado) $('cargando').textContent = 'Falta conectar con tu hoja.';
+  abrirConf();
+} else if (sinSenal) {
+  if (!guardado) $('cargando').textContent = 'Sin señal y sin datos guardados todavía.';
+  $('contenido').classList.remove('viejo');
+  mostrarEstado(lineaBase());
+} else {
+  sincronizar();
+}
+pintarControles();
+</script>
+</body>
+</html>
