@@ -161,6 +161,8 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
 
 var E = null;                 // lo que se ve en pantalla (hoja + cambios pendientes ya aplicados)
 var enVuelo = false;          // hay una petición a Apps Script en camino
+var corriendoBoton = false;   // un botón (Evaluar, Check...) se está ejecutando
+var botonEnEspera = null;     // botón tocado mientras se actualizaba: corre al terminar
 var sinSenal = navigator.onLine === false;
 var otraVez = false;          // se pidió sincronizar mientras otra iba en camino
 var ultimoTxt = '';           // texto a mostrar cuando se guarden los cambios
@@ -266,18 +268,24 @@ function sincronizar(opts) {
   opts = opts || {};
   clearTimeout(tSync);
   if (!leerConf()) { abrirConf(); return; }
-  if (enVuelo) { otraVez = true; return; }
+  if (enVuelo) {
+    if (opts.boton) { botonEnEspera = opts.boton; mostrarEstado('Trabajando…'); }
+    else otraVez = true;
+    return;
+  }
   if (navigator.onLine === false) { marcarSinSenal(); return; }
 
   var envio = leerCola();
   var estabaSinSenal = sinSenal;
   enVuelo = true;
+  if (opts.boton) corriendoBoton = true;
   pintarControles();
   if (opts.boton) mostrarEstado('Trabajando…');
   else if (!opts.silencioso) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
 
   pedir({ ops: envio, boton: opts.boton || '' }, opts.boton ? 120000 : 30000).then(function (d) {
     enVuelo = false;
+    corriendoBoton = false;
     sinSenal = false;
 
     // Quitar de la fila lo que ya llegó; lo que se agregó mientras tanto se queda
@@ -296,10 +304,20 @@ function sincronizar(opts) {
     else if (!opts.silencioso || estabaSinSenal) mostrarEstado(lineaBase());
     if (envio.length) ultimoTxt = '';
 
+    if (botonEnEspera) {
+      var siguiente = botonEnEspera;
+      botonEnEspera = null;
+      otraVez = false;
+      sincronizar({ boton: siguiente });
+      return;
+    }
     if (resto.length || otraVez) { otraVez = false; programarSync(); }
   }, function (err) {
     enVuelo = false;
+    corriendoBoton = false;
     otraVez = false;
+    var botonPerdido = botonEnEspera;
+    botonEnEspera = null;
     $('contenido').classList.remove('viejo');
 
     // Si un "total" de tiempo no llegó, se vuelve diferencia para no pisar lo que mande Clockify
@@ -319,6 +337,7 @@ function sincronizar(opts) {
     }
     marcarSinSenal();
     if (opts.boton) mostrarEstado('No llegó la respuesta. Toca ↻ para ver si se hizo.', true);
+    else if (botonPerdido) mostrarEstado('Sin conexión: el botón no se ejecutó.', true);
     if (!E) $('cargando').textContent = 'No se pudo cargar. Toca ↻ para reintentar.';
   });
 }
@@ -439,7 +458,7 @@ function pintarHabito(fila, h) {
 // Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
 function pintarControles() {
   document.querySelectorAll('[data-boton]').forEach(function (b) {
-    b.disabled = enVuelo || sinSenal || !E;
+    b.disabled = corriendoBoton || !!botonEnEspera || sinSenal || !E;
   });
 }
 
@@ -447,7 +466,6 @@ function render(estado, deCache) {
   E = estado;
   $('cargando').style.display = 'none';
   $('contenido').style.display = 'flex';
-  $('contenido').classList.toggle('viejo', !!deCache);
   if (!deCache) guardarCache(estado);
   $('fecha').textContent = '· ' + E.fecha.dia + ' ' + E.fecha.numero + ' de ' + String(E.fecha.mes || '').toLowerCase();
 
@@ -565,7 +583,7 @@ function guardarHM() {
 }
 
 function pedirBoton(nombre) {
-  if (enVuelo || sinSenal || !E) return;
+  if (corriendoBoton || botonEnEspera || sinSenal || !E) return;
   if (CONF[nombre]) {
     accion = nombre;
     $('ctit').textContent = CONF[nombre].t;
@@ -616,7 +634,7 @@ $('hok').addEventListener('click', guardarHM);
 $('kok').addEventListener('click', guardarConf);
 $('cok').addEventListener('click', function () {
   cerrar('conf');
-  if (!enVuelo && !sinSenal) sincronizar({ boton: accion });
+  if (!corriendoBoton && !botonEnEspera && !sinSenal) sincronizar({ boton: accion });
 });
 document.querySelectorAll('[data-boton]').forEach(function (b) {
   b.addEventListener('click', function () { pedirBoton(b.getAttribute('data-boton')); });
