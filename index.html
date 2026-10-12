@@ -823,17 +823,42 @@ document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible' && !enVuelo) sincronizar({ silencioso: true, fresco: true });
 });
 
-// Cada 15 s: si hay pendientes o no hubo conexión, reintenta. Si todo está al día, refresca cada minuto
-// (para ver el tiempo que escribe Clockify/n8n). No interrumpe si escribes o hay una ventana abierta.
+// Revisión rápida: pregunta a la hoja si otro aparato cambió algo; si sí, actualiza todo
+var verEnVuelo = false;
+function revisarVersion() {
+  if (verEnVuelo || !E) return;
+  verEnVuelo = true;
+  pedir({ soloVer: true }, 10000).then(function (d) {
+    verEnVuelo = false;
+    if (d.ver && E && d.ver !== E.ver && !enVuelo) { actividad(); sincronizar({ silencioso: true }); }
+  }, function (err) {
+    verEnVuelo = false;
+    if (err && err.tipo === 'red') marcarSinSenal();
+  });
+}
+
+// Última vez que hubo movimiento (tocaste algo, regresaste a la app o llegó un cambio del otro aparato)
+var ultimaActividad = Date.now();
+function actividad() { ultimaActividad = Date.now(); }
+document.addEventListener('pointerdown', actividad, true);
+document.addEventListener('keydown', actividad, true);
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') actividad(); });
+
+// Cada 5 s, con la app a la vista y sin ventanas abiertas:
+// - Con pendientes o sin conexión: reintenta cada 15 s.
+// - Al día: revisión rápida de cambios del otro aparato (cada 5 s si hubo movimiento en los
+//   últimos 10 minutos; si no, cada 15 s), y actualización completa cada minuto
+//   (para ver el tiempo que escribe Clockify/n8n y lo que cambies directo en la hoja).
 var tic = 0;
 setInterval(function () {
   tic++;
   if (document.visibilityState !== 'visible' || enVuelo || hayVentanaAbierta()) return;
-  if (document.activeElement === $('rac')) return;
   if (!leerConf()) return;
-  if (leerCola().length || sinSenal) sincronizar({ silencioso: true });
-  else if (tic % 4 === 0) sincronizar({ silencioso: true });
-}, 15000);
+  if (leerCola().length || sinSenal) { if (tic % 3 === 0) sincronizar({ silencioso: true }); return; }
+  if (tic % 12 === 0) { sincronizar({ silencioso: true }); return; }
+  var quieto = Date.now() - ultimaActividad > 10 * 60 * 1000;
+  if (!quieto || tic % 3 === 0) revisarVersion();
+}, 5000);
 
 /* ==================== VERSIÓN NUEVA ==================== */
 
