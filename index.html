@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" href="icono-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
-:root{--fondo:#E6F1FB;--borde-fondo:#85B7EB;--blanco:#FFFFFF;--texto:#1F1F1D;--texto2:#5F5E5A;--ok-bg:#C0DD97;--ok-tx:#173404;--ok-bd:#639922;--pe-bg:#FAC775;--pe-tx:#412402;--pe-bd:#BA7517;--ko-bg:#F7C1C1;--ko-tx:#501313;--ko-bd:#E24B4A;--azul:#185FA5;--radio:8px}
+:root{--ri-bg:#F79646;--ri-tx:#431407;--ri-bd:#C2410C;--fondo:#E6F1FB;--borde-fondo:#85B7EB;--blanco:#FFFFFF;--texto:#1F1F1D;--texto2:#5F5E5A;--ok-bg:#C0DD97;--ok-tx:#173404;--ok-bd:#639922;--pe-bg:#FAC775;--pe-tx:#412402;--pe-bd:#BA7517;--ko-bg:#F7C1C1;--ko-tx:#501313;--ko-bd:#E24B4A;--azul:#185FA5;--radio:8px}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--fondo);color:var(--texto);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button,input,select{font-family:inherit;color:inherit}
@@ -17,14 +17,17 @@ button,input,select{font-family:inherit;color:inherit}
 .ok{background:var(--ok-bg);color:var(--ok-tx);border:1.5px solid var(--ok-bd)}
 .pe{background:var(--pe-bg);color:var(--pe-tx);border:1.5px solid var(--pe-bd)}
 .ko{background:var(--ko-bg);color:var(--ko-tx);border:1.5px solid var(--ko-bd)}
+.ri{background:var(--ri-bg);color:var(--ri-tx);border:1.5px solid var(--ri-bd)}
 .sm{font-size:12px}
 .ttl{text-align:center;font-size:14px;font-weight:600}
 .tl{border-radius:var(--radio);padding:6px 8px}
 .ce{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .cab{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.ley{display:flex;gap:6px;color:var(--texto2)}
+.ley{display:flex;flex-wrap:wrap;justify-content:center;row-gap:2px;column-gap:6px;min-width:0;color:var(--texto2)}
 .ley i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:2px}
-.recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer}
+.recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer;display:grid;place-items:center;padding:0;color:var(--texto);text-decoration:none;flex:none}
+.pm{display:flex;align-items:center;gap:10px;border-radius:var(--radio);padding:0 8px;height:48px}
+.pmt{flex:1;min-width:0;border:none;background:transparent;padding:0;cursor:pointer;text-align:left;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx{border:none;background:transparent;padding:0 4px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
 .hb{display:flex;align-items:center;justify-content:space-between;border-radius:var(--radio);padding:0 8px;height:48px}
 .cb{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border:2px solid var(--texto);border-radius:5px;background:var(--blanco);display:grid;place-content:center;cursor:pointer;padding:0;flex:none}
@@ -59,9 +62,12 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
 <body>
 <div id="app">
   <div class="cab">
-    <span id="titulo" style="font-size:19px;font-weight:600">EvaDí <span id="fecha" style="font-size:15px;font-weight:500"></span></span>
+    <span id="titulo" style="font-size:19px;font-weight:600;white-space:nowrap">EvaDí <span id="fecha" style="font-size:15px;font-weight:500"></span></span>
     <span class="sm ley"><span><i class="pe"></i>Pend.</span><span><i class="ok"></i>Hecho</span><span><i class="ko"></i>Fallé</span></span>
-    <button class="recarga" id="recargar" aria-label="Recargar">↻</button>
+    <span style="display:flex;gap:6px;flex:none">
+      <a class="recarga" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a>
+      <button class="recarga" id="recargar" aria-label="Recargar">↻</button>
+    </span>
   </div>
   <div id="nueva" class="tl pe" style="display:none;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px 6px 12px">
     <span style="font-size:14px;font-weight:600">Hay versión nueva</span>
@@ -84,6 +90,10 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
         <button class="tx" id="tval" style="font-size:28px;font-weight:700;line-height:1.1" aria-label="Cambiar tiempo de hoy"></button>
       </div>
       <div style="justify-self:end;text-align:right;line-height:1.25"><span id="tfal" style="display:block;font-size:13px"></span><span id="tdif" style="display:block;font-size:15px;font-weight:600"></span></div>
+    </div>
+    <div id="pbox" class="pm pe" style="display:none">
+      <input id="pchk" type="checkbox" class="cb h" aria-label="Agendar ProMe de hoy">
+      <button id="ptxt" class="pmt" aria-label="Ver escalera de ProMe"></button>
     </div>
     <div class="ttl">Hábitos de hoy</div>
     <div id="habs" class="grid2" style="gap:5px"></div>
@@ -115,7 +125,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     </div>
     <div id="pcel" style="font-size:13px;color:var(--texto2)"></div>
     <select id="psel" aria-label="Cambiar opción" style="display:none"></select>
-    <div style="font-size:16px;font-weight:600">Notas</div>
+    <div id="pnh" style="font-size:16px;font-weight:600">Notas</div>
     <div id="pnot" style="font-size:16px;white-space:pre-line;line-height:1.55"></div>
   </div>
 </div>
@@ -183,7 +193,7 @@ var CONF = {
 
 function $(id) { return document.getElementById(id); }
 function hm(m) { m = Math.max(0, Math.round(m)); var r = m % 60; return Math.floor(m / 60) + ':' + (r < 10 ? '0' : '') + r; }
-function est(el, s) { el.classList.remove('ok', 'pe', 'ko'); el.classList.add(s); }
+function est(el, s) { el.classList.remove('ok', 'pe', 'ko', 'ri'); el.classList.add(s); }
 function pct(x) { return Math.round(x * 100) + ' %'; }
 
 /* ==================== GUARDADO LOCAL ==================== */
@@ -354,7 +364,7 @@ function marcarSinSenal() {
 function encolar(op, txt) {
   if (!E) return;
   op.id = nuevoId();
-  if (op.tipo !== 'tome') op.dia = E.dia;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome') op.dia = E.dia;
   var cola = leerCola();
   cola.push(op);
   guardarCola(cola);
@@ -368,7 +378,7 @@ function encolar(op, txt) {
 // Hace en pantalla lo mismo que hará Apps Script con ese cambio
 function aplicarLocal(estado, op) {
   if (!estado || !op) return;
-  if (op.tipo !== 'tome' && op.dia && estado.dia && op.dia !== estado.dia) return;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.dia && estado.dia && op.dia !== estado.dia) return;
   var h = estado.habitos ? estado.habitos[op.indice] : null;
   switch (op.tipo) {
     case 'marcar':
@@ -395,6 +405,9 @@ function aplicarLocal(estado, op) {
       break;
     case 'tiempo':
       estado.tiempo = op.modo === 'total' ? op.total : Math.max(0, (estado.tiempo || 0) + op.dif);
+      break;
+    case 'prome':
+      if (estado.prome && op.fecha === hoyLocal()) estado.prome.agendado = true;
       break;
     case 'tome':
       if (op.fecha === hoyLocal()) aplicarTomeLocal(estado, op.valor === true);
@@ -451,8 +464,39 @@ function pintarResumen() {
   });
 }
 
+// Naranja: pendiente y hoy sería el tercer día sin hacerlo
 function pintarHabito(fila, h) {
-  est(fila, h.hecho ? 'ok' : (h.falle ? 'ko' : 'pe'));
+  est(fila, h.hecho ? 'ok' : (h.falle ? 'ko' : (h.alerta ? 'ri' : 'pe')));
+}
+
+// Renglón de ProMe: verde si el evento de hoy ya está agendado
+function pintarProMe() {
+  var p = E.prome;
+  var caja = $('pbox');
+  if (!p) { caja.style.display = 'none'; return; }
+  caja.style.display = 'flex';
+  est(caja, p.agendado ? 'ok' : 'pe');
+  $('pchk').checked = !!p.agendado;
+  var t = $('ptxt');
+  t.textContent = '';
+  var b = document.createElement('b');
+  b.textContent = 'ProMe ';
+  t.appendChild(b);
+  t.appendChild(document.createTextNode(p.texto || 'Sin resultado de Hoy'));
+}
+
+function abrirProMe() {
+  var p = E && E.prome;
+  if (!p) return;
+  $('ptit').textContent = 'ProMe · Hoy';
+  $('pcel').textContent = p.agendado ? 'Agendado hoy en Eventos ProMe' : 'Sin agendar hoy';
+  $('pnh').textContent = 'Escalera';
+  $('psel').style.display = 'none';
+  $('psel').onchange = null;
+  $('pnot').textContent = (p.escalera || []).map(function (e) {
+    return e.nivel + ': ' + (e.texto || '—');
+  }).join('\n\n');
+  abrir('pop');
 }
 
 // Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
@@ -512,6 +556,7 @@ function render(estado, deCache) {
   });
 
   if (document.activeElement !== $('rac')) $('rac').value = E.rac;
+  pintarProMe();
   pintarResumen();
   pintarControles();
 }
@@ -526,7 +571,9 @@ function hayVentanaAbierta() {
 
 function abrirHabito(h) {
   $('ptit').textContent = h.texto;
-  $('pcel').textContent = 'Celda ' + h.celda + ' de EvaDi';
+  $('pcel').textContent = 'Celda ' + h.celda + ' de EvaDi' +
+    (h.alerta && !h.hecho && !h.falle ? ' · Si no lo haces hoy, sería el tercer día sin hacerlo' : '');
+  $('pnh').textContent = 'Notas';
   $('pnot').textContent = h.nota || 'Sin notas.';
   var sel = $('psel');
   sel.innerHTML = '';
@@ -625,6 +672,17 @@ function guardarConf() {
 
 $('recargar').addEventListener('click', function () { if (!enVuelo) sincronizar(); });
 $('titulo').addEventListener('click', function () { abrirConf(); });
+$('ptxt').addEventListener('click', abrirProMe);
+$('pchk').addEventListener('change', function () {
+  if (!E || !E.prome) return;
+  if (E.prome.agendado) {
+    $('pchk').checked = true;
+    mostrarEstado('ProMe ya está agendado hoy');
+    return;
+  }
+  if (!$('pchk').checked) return;
+  encolar({ tipo: 'prome', fecha: hoyLocal() }, 'ProMe agendado');
+});
 $('tome').addEventListener('change', function () {
   encolar({ tipo: 'tome', valor: $('tome').checked, fecha: hoyLocal() });
 });
