@@ -323,7 +323,7 @@ function sincronizar(opts) {
   if (opts.boton) corriendoBoton = true;
   pintarControles();
   if (opts.boton) mostrarEstado('Trabajando…');
-  else if (!opts.silencioso) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
+  else if (!opts.silencioso || envio.length) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
 
   pedir({ ops: envio, boton: opts.boton || '', fresco: !!opts.fresco || !opts.silencioso }, opts.boton ? 120000 : 30000).then(function (d) {
     enVuelo = false;
@@ -341,10 +341,12 @@ function sincronizar(opts) {
     resto.forEach(function (o) { aplicarLocal(nuevo, o); });
     render(nuevo);
 
+    var faltan = resto.length > 0 || otraVez || !!botonEnEspera;
     if (aviso) mostrarEstado(aviso, esError(aviso));
+    else if (faltan && (envio.length || resto.length)) mostrarEstado('Guardando…');
     else if (envio.length) mostrarEstado(ultimoTxt || 'Guardado');
     else if (!opts.silencioso || estabaSinSenal) mostrarEstado(lineaBase());
-    if (envio.length) ultimoTxt = '';
+    if (envio.length && !faltan) ultimoTxt = '';
 
     if (botonEnEspera) {
       var siguiente = botonEnEspera;
@@ -404,6 +406,7 @@ function encolar(op, txt) {
   aplicarLocal(E, op);
   render(E);
   if (sinSenal || navigator.onLine === false) mostrarEstado(lineaBase());
+  else mostrarEstado('Guardando…');
   programarSync();
 }
 
