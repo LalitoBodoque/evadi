@@ -623,7 +623,7 @@ function abrirRac() {
 }
 
 function guardarRac() {
-  var texto = $('ractx').value.slice(0, 2000);
+  var texto = $('ractx').value.replace(/\s*[\r\n]+\s*/g, ' ').trim().slice(0, 2000);
   cerrar('racp');
   if (!E || texto === (E.rac || '')) return;
   encolar({ tipo: 'rac', texto: texto });
@@ -984,6 +984,12 @@ document.querySelectorAll('[data-cerrar]').forEach(function (b) {
 $('rac').addEventListener('click', abrirRac);
 $('rac').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirRac(); } });
 $('racok').addEventListener('click', guardarRac);
+// Relevante es un solo renglón (en Cal no debe hacer más alta la fila): Enter guarda y lo pegado con saltos se une
+$('ractx').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); guardarRac(); } });
+$('ractx').addEventListener('input', function () {
+  var t = $('ractx');
+  if (/[\r\n]/.test(t.value)) { var p = t.selectionStart; t.value = t.value.replace(/[\r\n]+/g, ' '); t.setSelectionRange(p, p); }
+});
 
 // Señal: al regresar, se manda la fila de pendientes sola
 window.addEventListener('online', function () { sincronizar({ silencioso: true }); });
