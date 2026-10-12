@@ -18,30 +18,41 @@ button,input,select{font-family:inherit;color:inherit}
 .pe{background:var(--pe-bg);color:var(--pe-tx);border:1.5px solid var(--pe-bd)}
 .ko{background:var(--ko-bg);color:var(--ko-tx);border:1.5px solid var(--ko-bd)}
 .ri{background:var(--ri-bg);color:var(--ri-tx);border:1.5px solid var(--ri-bd)}
-.sm{font-size:12px}
-.ttl{text-align:center;font-size:14px;font-weight:600}
+.sm{font-size:13px}
+.ttl{text-align:center;font-size:15px;font-weight:600}
 .tl{border-radius:var(--radio);padding:6px 8px}
 .ce{text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .cab{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.ley{display:flex;flex-wrap:wrap;justify-content:center;row-gap:2px;column-gap:6px;min-width:0;color:var(--texto2)}
+.ley{font-size:12px;display:flex;flex-wrap:wrap;justify-content:center;row-gap:2px;column-gap:6px;min-width:0;color:var(--texto2)}
 .ley i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:2px}
 .recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer;display:grid;place-items:center;padding:0;color:var(--texto);text-decoration:none;flex:none}
 .pm{display:flex;align-items:center;gap:10px;border-radius:var(--radio);padding:0 8px;height:48px}
-.pmt{flex:1;min-width:0;border:none;background:transparent;padding:0;cursor:pointer;text-align:left;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prop{background:var(--azul);color:#FFE27A;font-weight:700;font-size:16px;line-height:1.45;text-align:center;border-radius:10px;padding:12px 14px}
+.esc{display:flex;flex-direction:column;gap:10px}
+.esl{display:flex;flex-direction:column;gap:4px;border-left:4px solid var(--c);padding:2px 0 2px 10px}
+.esl span{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--c)}
+.esl textarea{width:100%;border:1px solid #B4B2A9;border-radius:var(--radio);padding:8px 10px;font-family:inherit;font-size:15px;line-height:1.4;resize:none;overflow:hidden;background:var(--blanco);color:var(--texto)}
+.esl textarea:focus{outline:2px solid var(--c);outline-offset:0;border-color:transparent}
+.esl.hoy textarea{background:#FFF6E8;border-color:var(--pe-bd)}
+.pmt{flex:1;min-width:0;border:none;background:transparent;padding:0;cursor:pointer;text-align:left;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tx{border:none;background:transparent;padding:0 4px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
 .hb{display:flex;align-items:center;justify-content:space-between;border-radius:var(--radio);padding:0 8px;height:48px}
 .cb{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border:2px solid var(--texto);border-radius:5px;background:var(--blanco);display:grid;place-content:center;cursor:pointer;padding:0;flex:none}
 .cb.h:checked::after{content:"✓";font-size:16px;line-height:1;font-weight:700;color:var(--ok-tx)}
 .cb.f:checked::after{content:"✕";font-size:15px;line-height:1;font-weight:700;color:var(--ko-tx)}
 .hueco{width:24px;height:24px;flex:none}
-.ic{border:none;background:transparent;padding:0 6px;height:40px;cursor:pointer;font-size:20px;line-height:1;display:flex;align-items:center;justify-content:center}
-.bb{font-size:13px;line-height:1.15;padding:2px 4px;height:40px;white-space:normal;text-align:center;background:var(--blanco);border:1px solid var(--borde-fondo);border-radius:var(--radio);cursor:pointer}
+.ic{border:none;background:transparent;padding:0 6px;height:40px;cursor:pointer;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center}
+.bb{font-size:14px;line-height:1.15;padding:2px 4px;height:40px;white-space:normal;text-align:center;background:var(--blanco);border:1px solid var(--borde-fondo);border-radius:var(--radio);cursor:pointer}
 .bb:disabled{opacity:.5;cursor:default}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;text-align:center}
-#rac{width:100%;height:36px;border:1px solid var(--borde-fondo);border-radius:var(--radio);padding:0 10px;font-size:15px;background:var(--blanco)}
-#estado{min-height:15px;text-align:center}
+#rac{width:100%;height:36px;border:1px solid var(--borde-fondo);border-radius:var(--radio);padding:0 10px;font-size:16px;background:var(--blanco)}
+#estado{min-height:20px;text-align:center;font-size:14px;font-weight:700;line-height:1.35}
+#estado.e-ok{color:#2F6B12}
+#estado.e-info{color:var(--azul)}
+#estado.e-pend{color:#A44A0B}
+#estado.e-error{color:#B42318}
 .ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px;z-index:10}
 .dlg{background:var(--blanco);border-radius:12px;padding:16px 18px;width:100%;max-width:400px;max-height:85vh;overflow:auto;display:flex;flex-direction:column;gap:10px}
 .dt{font-size:18px;font-weight:600}
@@ -76,20 +87,20 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
   <div id="cargando">Cargando…</div>
   <div id="contenido" style="display:none;flex-direction:column;gap:7px">
     <div class="ok" id="sbox" style="border-radius:var(--radio);padding:8px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px">
-      <div style="justify-self:start;text-align:left;line-height:1.25"><span style="display:block;font-size:13px">Racha actual</span><span id="ract" style="display:block;font-size:15px;font-weight:600"></span></div>
+      <div style="justify-self:start;text-align:left;line-height:1.25"><span style="display:block;font-size:14px">Racha actual</span><span id="ract" style="display:block;font-size:16px;font-weight:600"></span></div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-        <span style="font-size:17px;font-weight:700">Sobriedad</span>
-        <label style="display:flex;align-items:center;gap:5px;font-size:13px"><input id="tome" type="checkbox"> Hoy tomé</label>
+        <span style="font-size:18px;font-weight:700">Sobriedad</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:14px"><input id="tome" type="checkbox"> Hoy tomé</label>
       </div>
-      <div style="justify-self:end;text-align:right;line-height:1.25"><span style="display:block;font-size:13px">Mejor racha</span><span id="rmej" style="display:block;font-size:15px;font-weight:600"></span></div>
+      <div style="justify-self:end;text-align:right;line-height:1.25"><span style="display:block;font-size:14px">Mejor racha</span><span id="rmej" style="display:block;font-size:16px;font-weight:600"></span></div>
     </div>
     <div class="tl pe" id="tbox" style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;padding:8px 12px">
-      <button class="tx" id="bmeta" style="justify-self:start;text-align:left;padding:0;line-height:1.25" aria-label="Cambiar meta de tiempo"><span style="display:block;font-size:13px">Meta</span><span id="mval" style="display:block;font-size:15px;font-weight:600"></span></button>
+      <button class="tx" id="bmeta" style="justify-self:start;text-align:left;padding:0;line-height:1.25" aria-label="Cambiar meta de tiempo"><span style="display:block;font-size:14px">Meta</span><span id="mval" style="display:block;font-size:16px;font-weight:600"></span></button>
       <div style="display:flex;flex-direction:column;align-items:center;line-height:1.15">
-        <span style="font-size:13px">Tiempo hoy</span>
-        <button class="tx" id="tval" style="font-size:28px;font-weight:700;line-height:1.1" aria-label="Cambiar tiempo de hoy"></button>
+        <span style="font-size:14px">Tiempo hoy</span>
+        <button class="tx" id="tval" style="font-size:30px;font-weight:700;line-height:1.1" aria-label="Cambiar tiempo de hoy"></button>
       </div>
-      <div style="justify-self:end;text-align:right;line-height:1.25"><span id="tfal" style="display:block;font-size:13px"></span><span id="tdif" style="display:block;font-size:15px;font-weight:600"></span></div>
+      <div style="justify-self:end;text-align:right;line-height:1.25"><span id="tfal" style="display:block;font-size:14px"></span><span id="tdif" style="display:block;font-size:16px;font-weight:600"></span></div>
     </div>
     <div id="pbox" class="pm pe" style="display:none">
       <input id="pchk" type="checkbox" class="cb h" aria-label="Agendar ProMe de hoy">
@@ -99,10 +110,10 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     <div id="habs" class="grid2" style="gap:5px"></div>
     <div class="ttl">Meta de todos: ≥ 90 %</div>
     <div class="grid4">
-      <div class="tl" id="m1" style="padding:4px"><div class="sm">Háb. mes</div><div style="font-size:16px;font-weight:600"></div></div>
-      <div class="tl" id="m2" style="padding:4px"><div class="sm">Tiem. mes</div><div style="font-size:16px;font-weight:600"></div></div>
-      <div class="tl" id="m3" style="padding:4px"><div class="sm">Mensual</div><div style="font-size:16px;font-weight:600"></div></div>
-      <div class="tl" id="m4" style="padding:4px"><div class="sm">Global</div><div style="font-size:16px;font-weight:600"></div></div>
+      <div class="tl" id="m1" style="padding:4px"><div class="sm">Háb. mes</div><div style="font-size:17px;font-weight:600"></div></div>
+      <div class="tl" id="m2" style="padding:4px"><div class="sm">Tiem. mes</div><div style="font-size:17px;font-weight:600"></div></div>
+      <div class="tl" id="m3" style="padding:4px"><div class="sm">Mensual</div><div style="font-size:17px;font-weight:600"></div></div>
+      <div class="tl" id="m4" style="padding:4px"><div class="sm">Global</div><div style="font-size:17px;font-weight:600"></div></div>
     </div>
     <div class="grid3">
       <button class="bb" data-boton="check">Check hábitos</button>
@@ -114,7 +125,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     </div>
     <input id="rac" type="text" aria-label="Relevante, agradecer y chistoso" placeholder="Relevante, agradecer y chistoso">
   </div>
-  <div id="estado" class="sm"></div>
+  <div id="estado"></div>
 </div>
 
 <div id="pop" class="ov">
@@ -123,7 +134,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <div id="ptit" class="dt"></div>
       <button class="x" data-cerrar="pop" aria-label="Cerrar">✕</button>
     </div>
-    <div id="pcel" style="font-size:13px;color:var(--texto2)"></div>
+    <div id="pcel" style="font-size:14px;color:var(--texto2)"></div>
     <select id="psel" aria-label="Cambiar opción" style="display:none"></select>
     <div id="pnh" style="font-size:16px;font-weight:600">Notas</div>
     <div id="pnot" style="font-size:16px;white-space:pre-line;line-height:1.55"></div>
@@ -150,6 +161,21 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     <div class="hm"><label>Horas<input id="hh" type="number" min="0" max="23" step="1" inputmode="numeric"></label><span style="font-size:22px;padding-bottom:8px">:</span><label>Minutos<input id="hmm" type="number" min="0" max="59" step="5" inputmode="numeric"></label></div>
     <div id="herr" style="font-size:14px;color:var(--ko-tx);display:none"></div>
     <button class="db pri" id="hok"></button>
+  </div>
+</div>
+
+<div id="prm" class="ov">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="prmt" style="gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div id="prmt" class="dt">ProMe</div>
+      <button class="x" data-cerrar="prm" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="prop" class="prop"></div>
+    <div id="esc" class="esc"></div>
+    <div class="grid2" style="gap:8px">
+      <button class="db" data-cerrar="prm">Cancelar</button>
+      <button class="db pri" id="escok">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -221,10 +247,16 @@ function nuevoId() { return Date.now().toString(36) + Math.random().toString(36)
 
 function esError(t) { return /^Error|No se encontr|No puede|Clockify|No se guard|descart|ocupada|No lleg/.test(t || ''); }
 
+// Color según lo que pasa: verde listo, azul trabajando, naranja sin señal o pendiente, rojo error
 function mostrarEstado(txt, error) {
   var e = $('estado');
-  e.textContent = txt || '';
-  e.style.color = error ? 'var(--ko-tx)' : 'var(--texto2)';
+  txt = txt || '';
+  e.textContent = txt;
+  var tipo = 'e-ok';
+  if (error) tipo = 'e-error';
+  else if (/…$/.test(txt)) tipo = 'e-info';
+  else if (/^Sin señal|^Sin conexión|pendiente/.test(txt)) tipo = 'e-pend';
+  e.className = txt ? tipo : '';
 }
 
 // Texto de fondo: sin señal y cuántos cambios esperan
@@ -293,7 +325,7 @@ function sincronizar(opts) {
   if (opts.boton) mostrarEstado('Trabajando…');
   else if (!opts.silencioso) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
 
-  pedir({ ops: envio, boton: opts.boton || '' }, opts.boton ? 120000 : 30000).then(function (d) {
+  pedir({ ops: envio, boton: opts.boton || '', fresco: !!opts.fresco || !opts.silencioso }, opts.boton ? 120000 : 30000).then(function (d) {
     enVuelo = false;
     corriendoBoton = false;
     sinSenal = false;
@@ -364,7 +396,7 @@ function marcarSinSenal() {
 function encolar(op, txt) {
   if (!E) return;
   op.id = nuevoId();
-  if (op.tipo !== 'tome' && op.tipo !== 'prome') op.dia = E.dia;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera') op.dia = E.dia;
   var cola = leerCola();
   cola.push(op);
   guardarCola(cola);
@@ -378,7 +410,7 @@ function encolar(op, txt) {
 // Hace en pantalla lo mismo que hará Apps Script con ese cambio
 function aplicarLocal(estado, op) {
   if (!estado || !op) return;
-  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.dia && estado.dia && op.dia !== estado.dia) return;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.dia && estado.dia && op.dia !== estado.dia) return;
   var h = estado.habitos ? estado.habitos[op.indice] : null;
   switch (op.tipo) {
     case 'marcar':
@@ -407,7 +439,13 @@ function aplicarLocal(estado, op) {
       estado.tiempo = op.modo === 'total' ? op.total : Math.max(0, (estado.tiempo || 0) + op.dif);
       break;
     case 'prome':
-      if (estado.prome && op.fecha === hoyLocal()) estado.prome.agendado = true;
+      if (estado.prome && op.fecha === hoyLocal()) estado.prome.agendado = op.valor !== false;
+      break;
+    case 'escalera':
+      if (estado.prome && Array.isArray(op.textos)) {
+        (estado.prome.escalera || []).forEach(function (e, i) { e.texto = op.textos[i]; });
+        estado.prome.texto = op.textos[op.textos.length - 1];
+      }
       break;
     case 'tome':
       if (op.fecha === hoyLocal()) aplicarTomeLocal(estado, op.valor === true);
@@ -485,18 +523,46 @@ function pintarProMe() {
   t.appendChild(document.createTextNode(p.texto || 'Sin resultado de Hoy'));
 }
 
+// Colores de la escalera: de lo lejano (índigo) a lo de hoy (naranja)
+var COLORES_ESCALERA = ['#3C3489', '#185FA5', '#0F6E56', '#3B6D11', '#854F0B', '#C2410C'];
+
+function crecer(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
+
 function abrirProMe() {
   var p = E && E.prome;
   if (!p) return;
-  $('ptit').textContent = 'ProMe · Hoy';
-  $('pcel').textContent = p.agendado ? 'Agendado hoy en Eventos ProMe' : 'Sin agendar hoy';
-  $('pnh').textContent = 'Escalera';
-  $('psel').style.display = 'none';
-  $('psel').onchange = null;
-  $('pnot').textContent = (p.escalera || []).map(function (e) {
-    return e.nivel + ': ' + (e.texto || '—');
-  }).join('\n\n');
-  abrir('pop');
+  $('prop').textContent = p.proposito || '';
+  $('prop').style.display = p.proposito ? 'block' : 'none';
+  var cont = $('esc');
+  cont.innerHTML = '';
+  (p.escalera || []).forEach(function (e, i, todos) {
+    var caja = document.createElement('label');
+    caja.className = 'esl' + (i === todos.length - 1 ? ' hoy' : '');
+    caja.style.setProperty('--c', COLORES_ESCALERA[i] || COLORES_ESCALERA[0]);
+    caja.style.marginLeft = (i * 5) + 'px';
+    var nivel = document.createElement('span');
+    nivel.textContent = e.nivel;
+    var t = document.createElement('textarea');
+    t.rows = 1;
+    t.value = e.texto || '';
+    t.addEventListener('input', function () { crecer(t); });
+    caja.appendChild(nivel);
+    caja.appendChild(t);
+    cont.appendChild(caja);
+  });
+  abrir('prm');
+  cont.querySelectorAll('textarea').forEach(crecer);
+}
+
+function guardarEscalera() {
+  var p = E && E.prome;
+  if (!p) return;
+  var textos = [];
+  $('esc').querySelectorAll('textarea').forEach(function (t) { textos.push(t.value.trim()); });
+  var antes = (p.escalera || []).map(function (e) { return e.texto || ''; });
+  cerrar('prm');
+  if (textos.length !== 6 || textos.join('\u0001') === antes.join('\u0001')) return;
+  encolar({ tipo: 'escalera', textos: textos }, 'Escalera guardada');
 }
 
 // Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
@@ -566,7 +632,7 @@ function render(estado, deCache) {
 function abrir(id) { $(id).style.display = 'flex'; }
 function cerrar(id) { $(id).style.display = 'none'; }
 function hayVentanaAbierta() {
-  return ['pop', 'conf', 'hmp', 'clv'].some(function (id) { return $(id).style.display === 'flex'; });
+  return ['pop', 'conf', 'hmp', 'clv', 'prm'].some(function (id) { return $(id).style.display === 'flex'; });
 }
 
 function abrirHabito(h) {
@@ -673,15 +739,11 @@ function guardarConf() {
 $('recargar').addEventListener('click', function () { if (!enVuelo) sincronizar(); });
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
+$('escok').addEventListener('click', guardarEscalera);
 $('pchk').addEventListener('change', function () {
   if (!E || !E.prome) return;
-  if (E.prome.agendado) {
-    $('pchk').checked = true;
-    mostrarEstado('ProMe ya está agendado hoy');
-    return;
-  }
-  if (!$('pchk').checked) return;
-  encolar({ tipo: 'prome', fecha: hoyLocal() }, 'ProMe agendado');
+  var v = $('pchk').checked;
+  encolar({ tipo: 'prome', fecha: hoyLocal(), valor: v }, v ? 'ProMe agendado' : 'ProMe quitado del calendario');
 });
 $('tome').addEventListener('change', function () {
   encolar({ tipo: 'tome', valor: $('tome').checked, fecha: hoyLocal() });
@@ -715,7 +777,7 @@ $('rac').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('ra
 window.addEventListener('online', function () { sincronizar({ silencioso: true }); });
 window.addEventListener('offline', marcarSinSenal);
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible' && !enVuelo) sincronizar({ silencioso: true });
+  if (document.visibilityState === 'visible' && !enVuelo) sincronizar({ silencioso: true, fresco: true });
 });
 
 // Cada 15 s: si hay pendientes o no hubo conexión, reintenta. Si todo está al día, refresca cada minuto
