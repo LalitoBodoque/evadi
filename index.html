@@ -258,9 +258,8 @@ var CLAVE_CACHE = 'evadiApp_estado';
 var CLAVE_COLA = 'evadiApp_cola';
 var CLAVE_CONF = 'evadiApp_conf';
 
-var CONF_REEVALUAR = { t: 'Hoy ya evaluaste', d: 'Evaluar otra vez vuelve a correr tu script sobre el mismo día. Úsalo solo si corregiste algo después de evaluar.', b: 'Evaluar de nuevo' };
 var CONF = {
-  evaluar: { t: '¿Seguro que quieres evaluar el día?', d: 'Pasa tus hábitos, tiempo y Relevante a Cal, crea el evento de ejercicio de mañana y deja EvaDi limpio para el siguiente día.', b: 'Sí, evaluar' },
+  evaluar: { t: '¿Seguro que quieres evaluar el día?', d: 'Pasa tus hábitos, tiempo y Relevante a Cal, y crea los eventos de mañana: ejercicio y ProMe (con el texto de ProMe Hoy). Tus palomitas y X se quedan a la vista hasta medianoche.', b: 'Sí, evaluar' },
   exentar: { t: '¿Seguro que quieres exentar el día?', d: 'Marca todos tus hábitos como hechos (menos Santa Brígida) y pone la meta de tiempo en 0.', b: 'Sí, exentar' }
 };
 
@@ -643,8 +642,11 @@ function guardarEscalera() {
 
 // Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
 function pintarControles() {
+  var evd = !!(E && E.evaluado);
   document.querySelectorAll('[data-boton]').forEach(function (b) {
-    b.disabled = corriendoBoton || !!botonEnEspera || sinSenal || !E;
+    var n = b.getAttribute('data-boton');
+    b.disabled = corriendoBoton || !!botonEnEspera || sinSenal || !E ||
+      (evd && (n === 'check' || n === 'tiempoHoy' || n === 'exentar'));
   });
   // Día evaluado: botón Evaluar en verde y aviso junto a "Hábitos de hoy"
   var ev = !!(E && E.evaluado);
@@ -897,7 +899,8 @@ function pedirBoton(nombre) {
   if (corriendoBoton || botonEnEspera || sinSenal || !E) return;
   if (CONF[nombre]) {
     accion = nombre;
-    var c = (nombre === 'evaluar' && E.evaluado) ? CONF_REEVALUAR : CONF[nombre];
+    if (E.evaluado) { mostrarEstado('Hoy ya evaluaste. Lo que corrijas se guarda directo en Cal.'); return; }
+    var c = CONF[nombre];
     $('ctit').textContent = c.t;
     $('cdes').textContent = c.d;
     $('cok').textContent = c.b;
