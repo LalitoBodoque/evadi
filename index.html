@@ -127,7 +127,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <div class="tl" id="m4" style="padding:4px"><div class="sm">Global</div><div style="font-size:17px;font-weight:600"></div></div>
     </div>
     <div class="grid3">
-      <button class="bb" data-boton="check">Check hábitos</button>
+      <button class="bb" data-boton="check">Clockify</button>
       <button class="bb" data-boton="tiempoHoy">Tiempo hoy</button>
       <button class="bb" data-boton="evaluar">Evaluar</button>
       <button class="bb" data-boton="ejercicio">Ejercicio</button>
@@ -243,7 +243,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
 
 var E = null;                 // lo que se ve en pantalla (hoja + cambios pendientes ya aplicados)
 var enVuelo = false;          // hay una petición a Apps Script en camino
-var corriendoBoton = false;   // un botón (Evaluar, Check...) se está ejecutando
+var corriendoBoton = false;   // un botón (Evaluar, Clockify...) se está ejecutando
 var botonEnEspera = null;     // botón tocado mientras se actualizaba: corre al terminar
 var sinSenal = navigator.onLine === false;
 var otraVez = false;          // se pidió sincronizar mientras otra iba en camino
@@ -532,7 +532,7 @@ function aplicarTomeLocal(estado, valor) {
 // Años y meses solo si hay; días siempre
 function ymdTexto(r) {
   var partes = [];
-  var esp = '\u00a0'; // espacio que no se parte: el número no se separa de su unidad
+  var esp = ' '; // espacio que no se parte: el número no se separa de su unidad
   if (r.a > 0) partes.push(r.a + esp + (r.a === 1 ? 'año' : 'años'));
   if (r.m > 0) partes.push(r.m + esp + (r.m === 1 ? 'mes' : 'meses'));
   partes.push(r.d + esp + (r.d === 1 ? 'día' : 'días'));
