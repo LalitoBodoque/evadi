@@ -7,9 +7,12 @@
  * - Los cambios de un día que ya no es el de EvaDi se descartan (menos "Hoy tomé" y ProMe, que traen su fecha).
  * - ProMe: la casilla agenda (crearEventoProMe) o quita el evento de hoy, y la escalera se puede editar.
  * - Los botones llaman a tus scripts existentes (Evaluar, Exentar, ejercicio, etc.).
- * - El botón "Clockify" (antes Check hábitos) solo lee Clockify: si "TikTok afiliado" lleva 30 min o más hoy,
- *   palomea el hábito de TikTok (C7); si no, deja desmarcadas sus dos casillas (hecho E7 y fallé D7).
- *   Ya no llama a checkHabitos(): los demás hábitos los marca el disparador del calendario.
+ * - El botón "Check hábitos" (se llamó "Clockify" un tiempo):
+ *   1) Revisa los eventos de HOY del calendario "🧕 Hábitos" para los demás hábitos (todos menos TikTok):
+ *      sin evento hoy (lo borraste) = palomita; evento con [C] al final = X; evento sin [C] = las dos vacías.
+ *   2) Lee Clockify: si "TikTok afiliado" lleva 30 min o más hoy, palomea el hábito de TikTok (C7);
+ *      si no, deja desmarcadas sus dos casillas (hecho E7 y fallé D7).
+ *   Ya no llama a checkHabitos(): usa la misma regla que el disparador del calendario.
  * - Nunca toca D10 (lo escribe n8n desde Clockify): los ajustes de tiempo van a N1/N2 o a Cal.
  * - Lleva un número de versión de los cambios: el cel y la PC lo revisan cada 5 s y se actualizan si cambió.
  * - Los hábitos se pueden renombrar y su nota se puede editar desde la app.
@@ -35,9 +38,9 @@ var EVADIAPP_PROP_CLAVE = 'EVADI_CLAVE';
 var EVADIAPP_PROP_CLOCKIFY = 'CLOCKIFY_API_KEY';
 var EVADIAPP_PROP_CLOCKIFY_WS = 'CLOCKIFY_WORKSPACE';  // se llena sola la primera vez (tu espacio de trabajo activo)
 var EVADIAPP_PROP_CLOCKIFY_USER = 'CLOCKIFY_USER_ID';  // se llena sola la primera vez
-// Plan gratis de Clockify: 30 consultas por hora entre todas tus claves. Cada toque al botón Clockify gasta 1.
+// Plan gratis de Clockify: 30 consultas por hora entre todas tus claves. Cada toque al botón Check hábitos gasta 1.
 
-// Hábito de TikTok que se revisa con Clockify al tocar el botón Clockify
+// Hábito de TikTok que se revisa con Clockify al tocar el botón Check hábitos
 var EVADIAPP_TIKTOK = {
   celda: 'C7',                // celda del nombre del hábito en EvaDi (ᕷ [30] Proyecto TikTok Afiliado)
   buscar: 'tiktok afiliado',  // se busca en el proyecto, la tarea o la descripción del registro de Clockify
@@ -639,8 +642,10 @@ function evadiApp_boton_(ss, hoja, nombre) {
     }
     switch (nombre) {
       case 'check':
-        // Botón "Clockify": solo revisa TikTok en Clockify (los demás hábitos los marca el calendario)
-        return evadiApp_tiktokClockify_(ss, hoja);
+        // Botón "Check hábitos": primero los demás hábitos desde el calendario, luego TikTok desde Clockify
+        var avisoCal = evadiApp_habitosCalHoy_(ss, hoja);
+        var avisoTik = evadiApp_tiktokClockify_(ss, hoja);
+        return avisoCal + ' · ' + avisoTik;
       case 'tiempoHoy':
         calcularTiempoHoy();
         return 'Meta de hoy calculada';
@@ -815,6 +820,81 @@ function evadiAppInstalarHabitosCal() {
   PropertiesService.getScriptProperties().setProperty(EVADIAPP_PROP_HAB_TOKEN, evadiApp_habCalTokenNuevo_());
   var n = Object.keys(evadiApp_habCalGuardarLista_(ss)).length;
   Logger.log('Listo: disparador creado y ' + n + ' eventos de hoy y mañana guardados.');
+}
+
+/**
+ * Botón "Check hábitos": revisa de una vez todos los hábitos (menos TikTok) contra los eventos de HOY
+ * del calendario "🧕 Hábitos". Misma regla que el disparador:
+ * - Sin evento hoy (lo borraste): palomita (y se quita la X).
+ * - Evento con [C] al final (CalenGoo = no me dio tiempo): X. Santa Brígida no tiene X: queda sin palomita.
+ * - Evento sin [C]: pendiente (las dos casillas vacías).
+ * Si un hábito tiene varios eventos hoy (ej. ejercicio): con uno sin [C] basta para dejarlo pendiente.
+ * Los hábitos al revés (EVADIAPP_HAB_AL_REVES) van al revés: sin evento = X; con evento = pendiente.
+ * Lee el calendario directo (no la lista guardada) para ver los títulos completos.
+ */
+function evadiApp_habitosCalHoy_(ss, hoja) {
+  var tz = ss.getSpreadsheetTimeZone();
+  var hoy = evadiApp_hoy_(ss);
+  var buscar = evadiApp_buscadorIconos_(hoja);
+  var alReves = evadiApp_habAlReves_();
+
+  // Eventos de hoy (repeticiones ya separadas; los borrados no vienen)
+  var eventos = [];
+  try {
+    var inicio = new Date(Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'00:00:00XXX"));
+    var fin = new Date(inicio.getTime() + 24 * 60 * 60 * 1000);
+    var pagina = null;
+    do {
+      var opc = { timeMin: inicio.toISOString(), timeMax: fin.toISOString(), singleEvents: true, maxResults: 250 };
+      if (pagina) opc.pageToken = pagina;
+      var r = Calendar.Events.list(EVADIAPP_CAL_HABITOS, opc);
+      eventos = eventos.concat(r.items || []);
+      pagina = r.nextPageToken;
+    } while (pagina);
+  } catch (err) {
+    return 'Error al leer el calendario de hábitos: ' + String((err && err.message) || err);
+  }
+
+  // Por hábito: 0 = sin evento hoy, 1 = solo eventos con [C], 2 = algún evento sin [C]
+  var estado = {};
+  eventos.forEach(function (it) {
+    if (!it || it.status === 'cancelled') return;
+    if (evadiApp_habCalFecha_(it.start, tz) !== hoy) return;  // empezó otro día
+    var titulo = String(it.summary || '');
+    var i = buscar(titulo);
+    if (i < 0) return;  // no es de un hábito (ej. la línea -----)
+    var s = evadiApp_tieneC_(titulo) ? 1 : 2;
+    if (!(estado[i] >= s)) estado[i] = s;
+  });
+
+  var palomitas = 0, equis = 0, pendientes = 0;
+  EVADIAPP.habitos.forEach(function (h, i) {
+    if (h.texto === EVADIAPP_TIKTOK.celda) return;  // TikTok lo decide Clockify
+    var s = estado[i] || 0;
+    if (alReves[i]) {
+      if (s === 0) { evadiApp_marcar_(ss, hoja, i, 'falle', true); equis++; }
+      else { evadiApp_marcar_(ss, hoja, i, 'hecho', false); evadiApp_marcar_(ss, hoja, i, 'falle', false); pendientes++; }
+      return;
+    }
+    if (s === 0) {
+      evadiApp_marcar_(ss, hoja, i, 'hecho', true);   // palomita (y quita la X)
+      palomitas++;
+    } else if (s === 1) {
+      if (h.falle) evadiApp_marcar_(ss, hoja, i, 'falle', true);   // X (y quita la palomita)
+      else evadiApp_marcar_(ss, hoja, i, 'hecho', false);          // Santa Brígida: solo sin palomita
+      equis++;
+    } else {
+      evadiApp_marcar_(ss, hoja, i, 'hecho', false);
+      if (h.falle) evadiApp_marcar_(ss, hoja, i, 'falle', false);
+      pendientes++;
+    }
+  });
+
+  var partes = [];
+  if (palomitas) partes.push(palomitas + (palomitas === 1 ? ' palomita' : ' palomitas'));
+  if (equis) partes.push(equis + ' X');
+  if (pendientes) partes.push(pendientes + (pendientes === 1 ? ' pendiente' : ' pendientes'));
+  return 'Hábitos: ' + (partes.join(', ') || 'sin cambios');
 }
 
 /**

@@ -127,7 +127,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <div class="tl" id="m4" style="padding:4px"><div class="sm">Global</div><div style="font-size:17px;font-weight:600"></div></div>
     </div>
     <div class="grid3">
-      <button class="bb" data-boton="check">Clockify</button>
+      <button class="bb" data-boton="check">Check hábitos</button>
       <button class="bb" data-boton="tiempoHoy">Tiempo hoy</button>
       <button class="bb" data-boton="evaluar">Evaluar</button>
       <button class="bb" data-boton="ejercicio">Ejercicio</button>
@@ -243,7 +243,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
 
 var E = null;                 // lo que se ve en pantalla (hoja + cambios pendientes ya aplicados)
 var enVuelo = false;          // hay una petición a Apps Script en camino
-var corriendoBoton = false;   // un botón (Evaluar, Clockify...) se está ejecutando
+var corriendoBoton = false;   // un botón (Evaluar, Check hábitos...) se está ejecutando
 var botonEnEspera = null;     // botón tocado mientras se actualizaba: corre al terminar
 var sinSenal = navigator.onLine === false;
 var otraVez = false;          // se pidió sincronizar mientras otra iba en camino
