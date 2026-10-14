@@ -25,6 +25,10 @@
  *   Si el título de un evento de HOY termina en [C] (lo marcaste como hecho en CalenGoo = no me dio tiempo),
  *   le pone X; si le quitas el [C], o si el evento vuelve a aparecer hoy, regresa a pendiente.
  *   Los hábitos de EVADIAPP_HAB_AL_REVES (hoy ninguno) funcionan al revés: borrar = X; si vuelve = pendiente.
+ * - Link del Rosario (para el documento donde se reza): doGet con ?accion=rosario&t=<contraseña del link>.
+ *   Pide confirmar con un botón; al confirmar borra el evento del Rosario de HOY en "🧕 Hábitos"
+ *   y palomea el Rosario en EvaDi (o en Cal si el día ya se evaluó). La contraseña del link es aparte
+ *   de la clave de la app (EVADI_ROSARIO_TOKEN) y solo sirve para esto.
  * Todas las funciones llevan el prefijo "evadiApp" para no chocar con tus otros archivos.
  */
 
@@ -33,6 +37,10 @@ var EVADIAPP_ID_LIBRO = '1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY';
 
 // Nombre de la propiedad donde vive la clave
 var EVADIAPP_PROP_CLAVE = 'EVADI_CLAVE';
+
+// Link del Rosario: su propia contraseña (no es la clave de la app) y la celda del hábito en EvaDi
+var EVADIAPP_PROP_ROSARIO = 'EVADI_ROSARIO_TOKEN';
+var EVADIAPP_ROSARIO_CELDA = 'C6';
 
 // Clockify: la API key vive en Propiedades del script (nunca en el código)
 var EVADIAPP_PROP_CLOCKIFY = 'CLOCKIFY_API_KEY';
@@ -82,9 +90,13 @@ var EVADIAPP = {
 /* ==================== ENTRADA ==================== */
 
 /**
- * Ya no sirve la pantalla (vive en GitHub Pages). Solo responde que está viva.
+ * La pantalla vive en GitHub Pages. Aquí solo:
+ * - ?accion=rosario: el link del documento del Rosario.
+ * - Cualquier otra cosa: responde que está viva.
  */
-function doGet() {
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  if (p.accion === 'rosario') return evadiApp_rosarioGet_(p);
   return evadiApp_json_({ ok: true, app: 'EvaDí API' });
 }
 
@@ -144,6 +156,137 @@ function evadiApp_claveValida_(clave) {
     if (guardada) cache.put('evadiClave', guardada, 21600);
   }
   return !!guardada && typeof clave === 'string' && clave === guardada;
+}
+
+/* ==================== ROSARIO DESDE EL DOCUMENTO ==================== */
+
+/**
+ * Córrela UNA vez desde el editor. Crea la contraseña del link del Rosario y muestra en el registro
+ * el final del link. El link completo = tu URL /exec + ese final.
+ * Si la vuelves a correr, el link viejo deja de servir y tienes que poner el nuevo en el documento.
+ */
+function evadiAppCrearLinkRosario() {
+  var token = Utilities.getUuid().replace(/-/g, '');
+  PropertiesService.getScriptProperties().setProperty(EVADIAPP_PROP_ROSARIO, token);
+  Logger.log('Pega esto justo después de tu URL que termina en /exec:');
+  Logger.log('?accion=rosario&t=' + token);
+}
+
+/**
+ * ¿La contraseña del link es la guardada?
+ */
+function evadiApp_rosarioTokenValido_(t) {
+  var guardado = PropertiesService.getScriptProperties().getProperty(EVADIAPP_PROP_ROSARIO);
+  return !!guardado && typeof t === 'string' && t === guardado;
+}
+
+/**
+ * Abre el link del Rosario.
+ * Sin ok=1: muestra el botón para confirmar (así una vista previa del link no marca nada).
+ * Con ok=1: borra el evento de hoy y palomea el Rosario.
+ */
+function evadiApp_rosarioGet_(p) {
+  var t = String(p.t || '');
+  if (!evadiApp_rosarioTokenValido_(t)) {
+    return evadiApp_pagina_('Link no válido', '<p>Este link ya no sirve. Crea uno nuevo con evadiAppCrearLinkRosario.</p>', false);
+  }
+
+  if (p.ok !== '1') {
+    var url = ScriptApp.getService().getUrl() + '?accion=rosario&t=' + encodeURIComponent(t) + '&ok=1';
+    return evadiApp_pagina_('Rosario',
+      '<p>¿Ya terminaron el Rosario?</p>' +
+      '<a class="btn" href="' + url + '" target="_top">Sí, marcar hecho</a>', false);
+  }
+
+  var resultado;
+  try {
+    resultado = evadiApp_rosarioHecho_();
+  } catch (err) {
+    return evadiApp_pagina_('No se pudo', '<p>' + evadiApp_html_(String((err && err.message) || err)) + '</p>', false);
+  }
+  return evadiApp_pagina_('Rosario hecho', '<p>' + evadiApp_html_(resultado) + '</p>', true);
+}
+
+/**
+ * Palomea el Rosario y borra su evento de HOY en "🧕 Hábitos".
+ * Primero palomea (si el calendario falla, la palomita ya quedó). Se puede repetir sin problema.
+ * El disparador del calendario también verá el borrado y volverá a palomear: no pasa nada.
+ */
+function evadiApp_rosarioHecho_() {
+  var candado = LockService.getScriptLock();
+  if (!candado.tryLock(25000)) throw new Error('La hoja está ocupada. Intenta de nuevo en un momento.');
+  try {
+    var ss = evadiApp_libro_();
+    var hoja = ss.getSheetByName(EVADIAPP.hoja);
+    if (!hoja) throw new Error('No encontré la pestaña EvaDi.');
+
+    var indice = -1;
+    EVADIAPP.habitos.forEach(function (h, i) { if (h.texto === EVADIAPP_ROSARIO_CELDA) indice = i; });
+    if (indice < 0) throw new Error('No encontré el hábito del Rosario en la configuración.');
+
+    // 1) Palomita (si el día ya se evaluó, va a Cal)
+    evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
+    SpreadsheetApp.flush();
+    evadiApp_subirVer_();  // el cel y la PC se actualizan en segundos
+
+    // 2) Borrar el evento (o eventos) del Rosario de hoy
+    var tz = ss.getSpreadsheetTimeZone();
+    var hoy = evadiApp_hoy_(ss);
+    var buscar = evadiApp_buscadorIconos_(hoja);
+    var borrados = 0;
+    try {
+      var inicio = new Date(Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'00:00:00XXX"));
+      var fin = new Date(inicio.getTime() + 24 * 60 * 60 * 1000);
+      var r = Calendar.Events.list(EVADIAPP_CAL_HABITOS, {
+        timeMin: inicio.toISOString(),
+        timeMax: fin.toISOString(),
+        singleEvents: true,
+        maxResults: 250
+      });
+      (r.items || []).forEach(function (it) {
+        if (!it || !it.id || it.status === 'cancelled') return;
+        if (evadiApp_habCalFecha_(it.start, tz) !== hoy) return;
+        if (buscar(String(it.summary || '')) !== indice) return;
+        Calendar.Events.remove(EVADIAPP_CAL_HABITOS, it.id);
+        borrados++;
+      });
+    } catch (err) {
+      return 'Palomita puesta, pero no pude borrar el evento: ' + String((err && err.message) || err);
+    }
+
+    return borrados
+      ? 'Palomita puesta y evento de hoy borrado.'
+      : 'Palomita puesta. No había evento del Rosario hoy.';
+  } finally {
+    candado.releaseLock();
+  }
+}
+
+/**
+ * Página sencilla para el link del Rosario (se ve bien en el cel).
+ */
+function evadiApp_pagina_(titulo, cuerpo, ok) {
+  var color = ok ? '#173404' : '#1F1F1D';
+  var fondo = ok ? '#C0DD97' : '#E6F1FB';
+  var html =
+    '<style>' +
+    'body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:' + fondo + ';color:' + color + '}' +
+    '.c{max-width:420px;margin:0 auto;padding:40px 20px;text-align:center}' +
+    'h1{font-size:24px;margin:0 0 16px}' +
+    'p{font-size:18px;line-height:1.5;margin:0 0 20px}' +
+    '.btn{display:inline-block;background:#185FA5;color:#FFFFFF;text-decoration:none;font-size:18px;font-weight:600;padding:14px 24px;border-radius:10px}' +
+    '</style>' +
+    '<div class="c"><h1>' + evadiApp_html_(titulo) + '</h1>' + cuerpo + '</div>';
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('EvaDí · ' + titulo)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Escapa texto para meterlo en HTML.
+ */
+function evadiApp_html_(t) {
+  return String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* ==================== SINCRONIZAR ==================== */
@@ -1131,7 +1274,7 @@ function evadiApp_habCalFecha_(t, tz) {
  * ¿El título termina en [C]? (lo que agrega CalenGoo al marcar un evento como hecho)
  */
 function evadiApp_tieneC_(t) {
-  return /\[C\]$/i.test(String(t || '').replace(/[︎️​-‍⁠]/g, '').trim());
+  return /\[C\]$/i.test(String(t || '').replace(/[\uFE0E\uFE0F\u200B-\u200D\u2060]/g, '').trim());
 }
 
 /**
