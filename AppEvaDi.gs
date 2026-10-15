@@ -29,6 +29,14 @@
  *   Pide confirmar con un botón; al confirmar borra el evento del Rosario de HOY en "🧕 Hábitos"
  *   y palomea el Rosario en EvaDi (o en Cal si el día ya se evaluó). La contraseña del link es aparte
  *   de la clave de la app (EVADI_ROSARIO_TOKEN) y solo sirve para esto.
+ * - Día anterior sin evaluar: si ayer no se evaluó (su W en Cal está vacío) y hoy tampoco,
+ *   EvaDi todavía tiene los datos de ayer. La app muestra una franja con dos salidas:
+ *   "Evaluar" (copia EvaDi al renglón de ayer) o "Descartar" (limpia EvaDi y ayer se queda vacío).
+ *   Mientras tanto, el botón Evaluar también evalúa ayer (así, evaluar a las 12:30 cae en su día),
+ *   Check hábitos y Tiempo hoy se apagan, y el calendario y el link del Rosario no marcan nada.
+ *   Si lo resuelves de las 5:00 en adelante, la app vuelve a leer tu calendario de hoy (como Check hábitos).
+ * - Evaluar desde la casilla M18 de la hoja pasa por aquí (evadiAppEvaluarDesdeHoja): mismo candado y mismas reglas.
+ * - Exentar también quita las X de los hábitos que quedan palomeados.
  * Todas las funciones llevan el prefijo "evadiApp" para no chocar con tus otros archivos.
  */
 
@@ -63,6 +71,13 @@ var EVADIAPP_PROP_HAB_LISTA = 'EVADI_HAB_LISTA';  // eventos de hoy y mañana (i
 // Hábitos "al revés" (celda del nombre): borrar su evento de hoy = X; si vuelve a aparecer = pendiente
 // Hoy no hay ninguno: todos funcionan igual (borrar = palomita, [C] = X). Ej. para usarlo: ['K3']
 var EVADIAPP_HAB_AL_REVES = [];
+
+// Día anterior sin evaluar
+var EVADIAPP_CORTE = 5;  // hora (0-23): antes de esta hora sigue siendo "tu noche" y no se relee el calendario de hoy
+var EVADIAPP_PROP_DESCARTADO = 'EVADI_AYER_DESCARTADO';  // fecha (aaaa-mm-dd) del último día que descartaste
+var EVADIAPP_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+var EVADIAPP_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+var EVADIAPP_DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 var EVADIAPP = {
   hoja: 'EvaDi',
@@ -224,6 +239,10 @@ function evadiApp_rosarioHecho_() {
     EVADIAPP.habitos.forEach(function (h, i) { if (h.texto === EVADIAPP_ROSARIO_CELDA) indice = i; });
     if (indice < 0) throw new Error('No encontré el hábito del Rosario en la configuración.');
 
+    // EvaDi todavía tiene el día anterior: la palomita de hoy caería en ese día
+    var ayerPend = evadiApp_ayer_(ss);
+    if (ayerPend) throw new Error('Primero evalúa o descarta el ' + ayerPend.texto + ' en EvaDí. Luego vuelve a abrir este link.');
+
     // 1) Palomita (si el día ya se evaluó, va a Cal)
     evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
     SpreadsheetApp.flush();
@@ -336,6 +355,7 @@ function evadiApp_aplicarCola_(ss, hoja, ops, avisos) {
   var nuevas = {};
   var diaHoja = evadiApp_diaHoja_(hoja);
   var descartadas = 0;
+  var ayerPend = null, ayerLeido = false;
 
   try {
     ops.forEach(function (op, i) {
@@ -344,8 +364,12 @@ function evadiApp_aplicarCola_(ss, hoja, ops, avisos) {
       if (!op || !op.id || vistas[k] || nuevas[k]) return;
       nuevas[k] = '1';
 
-      // Cambio hecho cuando EvaDi mostraba otro día: no se aplica
-      if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota' && op.dia && op.dia !== diaHoja) { descartadas++; return; }
+      // Cambio hecho cuando EvaDi mostraba otro día: no se aplica...
+      if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota' && op.dia && op.dia !== diaHoja) {
+        // ...salvo que sea de ayer y ayer siga sin evaluar (EvaDi todavía tiene ese día)
+        if (!ayerLeido) { ayerPend = evadiApp_ayer_(ss); ayerLeido = true; }
+        if (!(ayerPend && op.ymd && op.ymd === ayerPend.fecha)) { descartadas++; return; }
+      }
 
       try {
         var aviso = evadiApp_aplicarOp_(ss, hoja, op);
@@ -422,6 +446,7 @@ function evadiAppEstado(fresco) {
   // Día ya evaluado: palomitas, tiempo, meta y Relevante salen de Cal; las X, de la foto tomada al evaluar
   var dc = evadiApp_diaCal_(ss);
   var foto = dc.evaluado ? evadiApp_foto_(ss) : null;
+  var ayer = evadiApp_ayer_(ss, dc);  // día anterior sin evaluar (EvaDi todavía lo tiene) o null
 
   var habitos = EVADIAPP.habitos.map(function (h, i) {
     var texto = String(val(h.texto) || '').trim();
@@ -463,6 +488,7 @@ function evadiAppEstado(fresco) {
     rac: String((dc.evaluado ? dc.valor('AM1') : val('M15')) || ''),
     sobriedad: evadiApp_sobriedad_(ss),
     evaluado: dc.evaluado,
+    ayer: ayer ? { fecha: ayer.fecha, texto: ayer.texto, corto: ayer.corto } : null,
     prome: evadiApp_promeEstado_(ss, fresco === true),
     aviso: ''
   };
@@ -779,6 +805,16 @@ function evadiApp_prome_(ss, fecha) {
  */
 function evadiApp_boton_(ss, hoja, nombre) {
   try {
+    // Día anterior sin evaluar: EvaDi todavía tiene ese día
+    var ayer = evadiApp_ayer_(ss);
+    if (nombre === 'evaluar' && ayer) nombre = 'evaluarAyer';  // evaluar a las 12:30 cae en su día
+    if ((nombre === 'evaluarAyer' || nombre === 'descartarAyer') && !ayer) {
+      return 'No hay un día anterior pendiente de evaluar.';
+    }
+    if (ayer && (nombre === 'check' || nombre === 'tiempoHoy')) {
+      return 'Primero evalúa o descarta el ' + ayer.texto + '.';
+    }
+
     // Con el día evaluado, estos botones moverían EvaDi (que ya es de mañana) o volverían a evaluar
     if (['check', 'tiempoHoy', 'exentar', 'evaluar'].indexOf(nombre) >= 0 && evadiApp_evaluado_(ss)) {
       return 'Hoy ya está evaluado: ese botón no se ejecutó.';
@@ -806,16 +842,18 @@ function evadiApp_boton_(ss, hoja, nombre) {
         return 'Evento de ejercicio creado';
       case 'exentar':
         disparadorExentar({ source: ss, range: hoja.getRange('G16'), value: 'TRUE' });
+        evadiApp_quitarX_(hoja);  // que no quede palomita y X al mismo tiempo
         return 'Día exentado';
       case 'evaluar':
-        // Relevante sin saltos de línea, para que la fila de hoy en Cal no se haga más alta
-        var celdaRac = hoja.getRange('M15');
-        var textoRac = String(celdaRac.getValue() || '');
-        if (/[\r\n]/.test(textoRac)) celdaRac.setValue(textoRac.replace(/\s*[\r\n]+\s*/g, ' ').trim());
-        evadiApp_guardarFoto_(ss, hoja);   // las X de hoy, para seguir viéndolas después de evaluar
-        Evaluar();
-        var avisoProMe = evadiApp_promeManana_(ss);
-        return 'Día evaluado' + (avisoProMe ? ' · ' + avisoProMe : '');
+        return evadiApp_evaluar_(ss, hoja, null);
+      case 'evaluarAyer':
+        return evadiApp_evaluar_(ss, hoja, ayer);
+      case 'descartarAyer':
+        if (!evadiApp_evaluarNuevo_()) return 'Error: falta pegar el Evaluar.gs nuevo en Apps Script.';
+        Evaluar({ evadi: true, soloLimpiar: true });  // limpia EvaDi sin copiar nada a Cal
+        PropertiesService.getScriptProperties().setProperty(EVADIAPP_PROP_DESCARTADO, ayer.fecha);
+        var relDesc = ayer.bloquea ? evadiApp_habitosCalHoy_(ss, hoja) : '';
+        return 'Se descartó el ' + ayer.texto + (relDesc ? ' · ' + relDesc : '');
       default:
         throw new Error('Botón desconocido.');
     }
@@ -826,6 +864,122 @@ function evadiApp_boton_(ss, hoja, nombre) {
     if (/getUi/i.test(msg)) return 'No se encontró el calendario que usa este botón.';
     return 'Error: ' + msg;
   }
+}
+
+/* ==================== EVALUAR ==================== */
+
+/**
+ * Evalúa con tu Evaluar(). ayer = null evalúa hoy; con ayer, escribe en el renglón de ayer.
+ * Evaluar() se detiene sin limpiar EvaDi si algo no llegó a Cal (el error sale en la app).
+ */
+function evadiApp_evaluar_(ss, hoja, ayer) {
+  if (ayer && !evadiApp_evaluarNuevo_()) return 'Error: falta pegar el Evaluar.gs nuevo en Apps Script.';
+
+  // Relevante sin saltos de línea, para que la fila del día en Cal no se haga más alta
+  var celdaRac = hoja.getRange('M15');
+  var textoRac = String(celdaRac.getValue() || '');
+  if (/[\r\n]/.test(textoRac)) celdaRac.setValue(textoRac.replace(/\s*[\r\n]+\s*/g, ' ').trim());
+
+  if (!ayer) evadiApp_guardarFoto_(ss, hoja);  // las X de hoy, para seguir viéndolas después de evaluar
+
+  var avisos = Evaluar(ayer ? { evadi: true, fila: ayer.fila, diasAtras: 1 } : { evadi: true });
+  var partes = [ayer ? 'Se evaluó el ' + ayer.texto : 'Día evaluado'];
+  if (Array.isArray(avisos)) partes = partes.concat(avisos);
+
+  // ProMe: el que sigue al día evaluado (si evaluaste ayer, es el de hoy)
+  var avisoProMe = evadiApp_promeManana_(ss, ayer ? 1 : 0);
+  if (avisoProMe) partes.push(avisoProMe);
+
+  // Ya de día: EvaDi quedó limpio, se vuelven a leer los hábitos de hoy desde el calendario
+  if (ayer && ayer.bloquea) partes.push(evadiApp_habitosCalHoy_(ss, hoja));
+  return partes.join(' · ');
+}
+
+/** ¿Está pegado el Evaluar.gs que acepta opciones (renglón de ayer y descartar)? */
+function evadiApp_evaluarNuevo_() {
+  return typeof EVALUAR_VERSION !== 'undefined' && EVALUAR_VERSION >= 2;
+}
+
+/**
+ * Evaluar desde la casilla M18 de la hoja (lo llama miActivadorDeEdicion de Evaluar.gs).
+ * Mismo camino que el botón de la app: candado, no evalúa dos veces, evalúa ayer si se te pasó,
+ * agenda el ProMe y avisa a la app. El resultado sale como aviso abajo a la derecha de la hoja.
+ */
+function evadiAppEvaluarDesdeHoja() {
+  var ss = evadiApp_libro_();
+  var hoja = ss.getSheetByName(EVADIAPP.hoja);
+  if (!hoja) return;
+  var candado = LockService.getScriptLock();
+  if (!candado.tryLock(25000)) {
+    hoja.getRange('M18').setValue(false);
+    ss.toast('La hoja está ocupada. Vuelve a marcar Evaluar en un momento.', 'EvaDí', 8);
+    return;
+  }
+  var msg = '';
+  try {
+    SpreadsheetApp.flush();
+    msg = evadiApp_boton_(ss, hoja, 'evaluar');
+    hoja.getRange('M18').setValue(false);
+    SpreadsheetApp.flush();
+    evadiApp_subirVer_();  // el cel y la PC se actualizan en segundos
+  } finally {
+    candado.releaseLock();
+  }
+  ss.toast(msg, 'EvaDí', 8);
+}
+
+/**
+ * Quita la X de los hábitos que tienen palomita (Exentar palomea pero no quita las X).
+ */
+function evadiApp_quitarX_(hoja) {
+  SpreadsheetApp.flush();
+  var valores = hoja.getRange('A1:N18').getValues();
+  EVADIAPP.habitos.forEach(function (h) {
+    if (!h.falle) return;
+    var ph = evadiApp_pos_(h.hecho), pf = evadiApp_pos_(h.falle);
+    if (valores[ph.r][ph.c] === true && valores[pf.r][pf.c] === true) hoja.getRange(h.falle).setValue(false);
+  });
+}
+
+/**
+ * Día anterior sin evaluar.
+ * Es "pendiente" si: hoy no está evaluado, el renglón de ayer en Cal tiene W vacío
+ * y no lo descartaste. En ese caso EvaDi todavía tiene los datos de ayer.
+ * Devuelve { fecha, fila, texto: 'martes 14', corto: 'Mar 14 de oct', bloquea } o null.
+ * bloquea = ya son las 5:00 o más (al resolverlo se relee el calendario de hoy).
+ */
+function evadiApp_ayer_(ss, dc) {
+  dc = dc || evadiApp_diaCal_(ss);
+  if (!dc.fila || dc.evaluado) return null;
+
+  var hoy = evadiApp_hoy_(ss);
+  var fecha = evadiApp_restarDia_(hoy);
+  if (PropertiesService.getScriptProperties().getProperty(EVADIAPP_PROP_DESCARTADO) === fecha) return null;
+
+  var p = fecha.split('-').map(Number);
+  var etiqueta = (p[2] < 10 ? '0' : '') + p[2] + '-' + EVADIAPP_MESES[p[1] - 1];  // como en Cal: 14-octubre
+
+  // Ayer está arriba de hoy; el día 1 hay que brincar el renglón de totales y el vacío
+  var colW = evadiApp_pos_(dc.dir('AK1')).c + 1;
+  var desde = Math.max(1, dc.fila - 3);
+  var n = dc.fila - desde;
+  if (n < 1) return null;
+  var cal = ss.getSheetByName(EVADIAPP.hojaCal);
+  var datos = cal.getRange(desde, 1, n, colW).getDisplayValues();
+  for (var i = n - 1; i >= 0; i--) {
+    if (evadiApp_normal_(datos[i][0]) !== etiqueta) continue;
+    if (String(datos[i][colW - 1]).trim() !== '') return null;  // ayer sí se evaluó
+    var dSem = new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay();
+    var hora = Number(Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'H'));
+    return {
+      fecha: fecha,
+      fila: desde + i,
+      texto: EVADIAPP_DIAS[dSem] + ' ' + p[2],
+      corto: EVADIAPP_DIAS_CORTO[dSem] + ' ' + p[2] + ' de ' + EVADIAPP_MESES[p[1] - 1].slice(0, 3),
+      bloquea: hora >= EVADIAPP_CORTE
+    };
+  }
+  return null;
 }
 
 /* ==================== CLOCKIFY: TIKTOK ==================== */
@@ -1088,6 +1242,15 @@ function evadiAppHabitoBorrado(e) {
     var alReves = evadiApp_habAlReves_();
     var lista = evadiApp_habCalLeerLista_();
     var cambios = evadiApp_habCalCambios_();
+
+    // EvaDi todavía tiene el día anterior sin evaluar: no se marca nada
+    // (al evaluarlo o descartarlo de día, la app vuelve a leer el calendario de hoy)
+    if (evadiApp_ayer_(ss)) {
+      evadiApp_habCalGuardarLista_(ss);
+      Logger.log('Calendario de hábitos en pausa: falta evaluar o descartar el día anterior.');
+      return;
+    }
+
     var padres = {};
     var marcados = [];
     var revisar = {};  // hábitos al revés que hay que volver a revisar
@@ -1345,7 +1508,7 @@ function evadiAppProbarHabitosCal() {
  * Devuelve { evaluado, valor(puntero), celda(puntero) }.
  */
 function evadiApp_diaCal_(ss) {
-  var nada = { evaluado: false, valor: function () { return ''; }, celda: function () { return null; } };
+  var nada = { evaluado: false, fila: 0, dir: function () { return ''; }, valor: function () { return ''; }, celda: function () { return null; } };
   var cal = ss.getSheetByName(EVADIAPP.hojaCal);
   if (!cal) return nada;
   var punteros = cal.getRange('AE1:AM2').getDisplayValues();
@@ -1367,6 +1530,8 @@ function evadiApp_diaCal_(ss) {
   var w = valor('AK1');
   return {
     evaluado: w !== '' && w !== null,
+    fila: fila,
+    dir: dir,
     valor: valor,
     celda: function (p) { var d = dir(p); return /^[A-Z]+\d+$/.test(d) ? cal.getRange(d) : null; }
   };
@@ -1407,26 +1572,30 @@ function evadiApp_foto_(ss) {
 /**
  * Agenda el ProMe de mañana con el texto de ProMe Hoy (misma hora, duración y etiqueta que EventosProMe.gs).
  * Si mañana ya hay uno con la etiqueta, no lo duplica.
+ * diasAtras = 1 cuando se evaluó ayer: entonces el que sigue es el de hoy.
  */
-function evadiApp_promeManana_(ss) {
+function evadiApp_promeManana_(ss, diasAtras) {
+  diasAtras = Number(diasAtras) || 0;
+  var cual = diasAtras ? 'de hoy' : 'de mañana';
   if (typeof PROME_HOJA === 'undefined' || typeof PROME_CALENDARIO_ID === 'undefined') return '';
   try {
     var sh = ss.getSheetByName(PROME_HOJA);
     if (!sh) return '';
     var titulo = String(sh.getRange(PROME_FILA, PROME_COL_TEXTO).getValue()).trim();
-    if (!titulo) return 'ProMe de mañana sin texto: no se agendó.';
+    if (!titulo) return 'ProMe ' + cual + ' sin texto: no se agendó.';
     var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
     if (!cal) return 'No encontré el calendario de ProMe.';
     var hoy = new Date();
-    var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1, PROME_HORA, PROME_MIN, 0);
+    var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1 - diasAtras, PROME_HORA, PROME_MIN, 0);
     var yaEsta = cal.getEventsForDay(inicio).some(function (ev) {
       return ev.getTitle().indexOf(PROME_ETIQUETA) >= 0;
     });
-    if (yaEsta) return 'ProMe de mañana ya estaba agendado.';
+    if (yaEsta) return 'ProMe ' + cual + ' ya estaba agendado.';
     cal.createEvent(titulo + ' ' + PROME_ETIQUETA, inicio, new Date(inicio.getTime() + PROME_DURACION * 60000));
-    return 'ProMe de mañana agendado';
+    if (diasAtras) CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '1', 120);  // renglón ProMe en verde
+    return 'ProMe ' + cual + ' agendado';
   } catch (err) {
-    return 'No se agendó el ProMe de mañana: ' + String((err && err.message) || err);
+    return 'No se agendó el ProMe ' + cual + ': ' + String((err && err.message) || err);
   }
 }
 
