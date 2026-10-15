@@ -1,9 +1,13 @@
 /**
  * ProMe — un solo resultado
  * Al palomear la casilla B13 de la hoja "ProMe", crea el evento de hoy
- * en el calendario de Eventos ProMe usando el texto del resultado (D13),
- * con la etiqueta [wpro] al final para poder buscarlo después.
+ * en el calendario "🧕 Hábitos" usando el texto del resultado (D13),
+ * con el ícono del hábito al inicio (❗) y la etiqueta [wpro] al final para poder buscarlo después.
  * Luego regresa la casilla a FALSE.
+ *
+ * El ícono hace que el evento cuente como el hábito "❗ Hacer ProMe" en EvaDí:
+ * borrarlo = palomita, [C] en CalenGoo = X, sin tocar = pendiente.
+ * Al crearlo, también se anota el texto en el registro ProMeLog (si AppEvaDi.gs está en el proyecto).
  */
 
 // ---------- Configuración ----------
@@ -15,9 +19,12 @@ var PROME_HORA        = 6;         // hora de inicio
 var PROME_MIN         = 30;        // minuto de inicio
 var PROME_DURACION    = 15;        // duración en minutos
 var PROME_ETIQUETA    = "[wpro]";  // etiqueta que se agrega al final del título
+var PROME_ICONO       = "❗";       // ícono del hábito en EvaDi (C5): va al inicio del título
 
+// Calendario "🧕 Hábitos" (antes era el calendario propio de Eventos ProMe:
+// c126d209e000f66e72ffe0b857146e6e86e5053d05bbc4fb3ba5d7904fe76a1b@group.calendar.google.com)
 // Se usa el ID y no el nombre, porque el emoji del nombre no coincide al copiarlo
-var PROME_CALENDARIO_ID = "c126d209e000f66e72ffe0b857146e6e86e5053d05bbc4fb3ba5d7904fe76a1b@group.calendar.google.com";
+var PROME_CALENDARIO_ID = "91ca38be8b5e74d65dc02bdc5d4b300f9c647c545983e538ea7953153a181b84@group.calendar.google.com";
 // -----------------------------------
 
 function disparadorProMe(e) {
@@ -50,7 +57,8 @@ function disparadorProMe(e) {
 }
 
 /**
- * Crea el evento de hoy en el calendario de ProMe, con la etiqueta al final.
+ * Crea el evento de hoy en el calendario de ProMe, con el ícono al inicio y la etiqueta al final.
+ * Además anota el texto en el registro ProMeLog.
  */
 function crearEventoProMe(titulo) {
   var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
@@ -64,10 +72,13 @@ function crearEventoProMe(titulo) {
   var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), PROME_HORA, PROME_MIN, 0);
   var fin = new Date(inicio.getTime() + PROME_DURACION * 60 * 1000);
 
-  var tituloFinal = titulo + " " + PROME_ETIQUETA;
+  var tituloFinal = PROME_ICONO + " " + titulo + " " + PROME_ETIQUETA;
 
   cal.createEvent(tituloFinal, inicio, fin);
   Logger.log("Evento creado: " + tituloFinal + " a las " + inicio);
+
+  // Registro para la sesión semanal (vive en AppEvaDi.gs)
+  if (typeof evadiAppProMeRegistrar === "function") evadiAppProMeRegistrar(inicio, titulo);
 }
 
 /**

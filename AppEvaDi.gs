@@ -37,6 +37,12 @@
  *   Si lo resuelves de las 5:00 en adelante, la app vuelve a leer tu calendario de hoy (como Check hábitos).
  * - Evaluar desde la casilla M18 de la hoja pasa por aquí (evadiAppEvaluarDesdeHoja): mismo candado y mismas reglas.
  * - Exentar también quita las X de los hábitos que quedan palomeados.
+ * - ProMe: el evento vive en "🧕 Hábitos" con el ícono ❗ (EventosProMe.gs) y cuenta como el hábito "❗ Hacer ProMe".
+ *   Registro en la hoja oculta "ProMeLog" (Fecha | ProMe | Resultado | Hora) para la sesión semanal:
+ *   el texto se anota al crear el evento; Resultado y Hora cuando cambia la casilla del hábito;
+ *   al evaluar se cierra el día ("No se hizo" si quedó pendiente).
+ *   El renglón de arriba se pone verde si hoy hay ProMe en el registro (aunque ya hayas borrado el evento).
+ *   Desmarcarlo quita el evento y el registro de hoy sin contarlo como palomita; si el hábito ya está marcado, no deja.
  * Todas las funciones llevan el prefijo "evadiApp" para no chocar con tus otros archivos.
  */
 
@@ -79,6 +85,10 @@ var EVADIAPP_MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'ju
 var EVADIAPP_DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 var EVADIAPP_DIAS_CORTO = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+// Registro de ProMe (hoja oculta, se crea sola)
+var EVADIAPP_HOJA_PROMELOG = 'ProMeLog';
+var EVADIAPP_PROME_IDX = null;  // índice del hábito de ProMe (se calcula una vez por ejecución)
+
 var EVADIAPP = {
   hoja: 'EvaDi',
   hojaCal: 'Cal',
@@ -98,7 +108,7 @@ var EVADIAPP = {
     { texto: 'K3', hecho: 'M3', falle: 'L3', alerta: 'J3', cal: 'AE2' },  // Izq 4: 🐟 (antes Pes)
     { texto: 'C7', hecho: 'E7', falle: 'D7', alerta: 'B7', cal: 'AJ1' },  // Der 4: TikTok
     { texto: 'K6', hecho: 'M6', falle: 'L6', alerta: 'J6', cal: 'AH2' },  // Izq 5: Comida (lista desplegable)
-    { texto: 'C5', hecho: 'E5', falle: 'D5', alerta: 'B5', cal: 'AH1' }   // Der 5: Anki
+    { texto: 'C5', hecho: 'E5', falle: 'D5', alerta: 'B5', cal: 'AH1' }   // Der 5: Hacer ProMe (antes Anki)
   ]
 };
 
@@ -529,6 +539,10 @@ function evadiApp_marcar_(ss, hoja, indice, campo, valor) {
     if (campo === 'falle') foto.falle[i] = valor;
     else if (valor) foto.falle[i] = false;
     evadiApp_escribirFoto_(foto);
+    if (i === evadiApp_promeIndice_(hoja)) {
+      var hechoCal = celda.getValue() === true;
+      evadiApp_promeLogMarca_(ss, dc, hechoCal, !hechoCal && foto.falle[i] === true);
+    }
     return '';
   }
 
@@ -540,6 +554,11 @@ function evadiApp_marcar_(ss, hoja, indice, campo, valor) {
     if (valor) hoja.getRange(h.hecho).setValue(false);
   } else {
     throw new Error('Casilla no válida.');
+  }
+  if (Number(indice) === evadiApp_promeIndice_(hoja)) {
+    evadiApp_promeLogMarca_(ss, dc,
+      hoja.getRange(h.hecho).getValue() === true,
+      h.falle ? hoja.getRange(h.falle).getValue() === true : false);
   }
   return '';
 }
@@ -745,13 +764,22 @@ function evadiApp_escalera_(ss, textos) {
  * Quita del calendario los eventos de hoy con la etiqueta [wpro] (al desmarcar en la app).
  */
 function evadiApp_promeQuitar_(ss, fecha) {
-  if (String(fecha || '') !== evadiApp_hoy_(ss)) return 'El ProMe de otro día no se quitó.';
+  var hoy = evadiApp_hoy_(ss);
+  if (String(fecha || '') !== hoy) return 'El ProMe de otro día no se quitó.';
+
+  // Si el hábito ya está marcado, quitarlo borraría el registro de que sí lo hiciste
+  var reg = evadiApp_promeLogLeer_(ss, hoy);
+  if (reg && reg.resultado) return 'Primero quítale la palomita o la X al hábito de ProMe: hoy ya está marcado (' + reg.resultado + ').';
+
   var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
   if (!cal) throw new Error('No encontré el calendario de ProMe.');
+  var cache = CacheService.getScriptCache();
+  cache.put('evadiProMeQuitado_' + hoy, '1', 600);  // el disparador del calendario no lo cuenta como palomita
   cal.getEventsForDay(new Date()).forEach(function (ev) {
     if (ev.getTitle().indexOf(PROME_ETIQUETA) >= 0) ev.deleteEvent();
   });
-  CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '0', 120);
+  if (reg) evadiApp_promeLogHoja_(ss).deleteRow(reg.fila);  // hoy ya no hay ProMe planeado
+  cache.put('evadiProMe_' + hoy, '0', 120);
   return '';
 }
 
@@ -768,6 +796,12 @@ function evadiApp_promeAgendado_(ss, fresco) {
   }
   var si = false;
   try {
+    // Hay ProMe de hoy en el registro (aunque ya hayas borrado el evento al hacerlo)
+    var reg = evadiApp_promeLogLeer_(ss, evadiApp_hoy_(ss));
+    if (reg && String(reg.texto).trim()) {
+      cache.put(clave, '1', 120);
+      return true;
+    }
     var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
     if (cal) {
       si = cal.getEventsForDay(new Date()).some(function (ev) {
@@ -795,9 +829,9 @@ function evadiApp_prome_(ss, fecha) {
   var titulo = String(sh.getRange(PROME_FILA, PROME_COL_TEXTO).getValue()).trim();
   if (titulo === '') return 'El resultado de Hoy en ProMe está vacío.';
 
-  crearEventoProMe(titulo);
+  crearEventoProMe(titulo);  // también lo anota en el registro
   CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '1', 120);
-  return '';
+  return 'ProMe de hoy agendado: ' + titulo;
 }
 
 /**
@@ -881,6 +915,7 @@ function evadiApp_evaluar_(ss, hoja, ayer) {
   if (/[\r\n]/.test(textoRac)) celdaRac.setValue(textoRac.replace(/\s*[\r\n]+\s*/g, ' ').trim());
 
   if (!ayer) evadiApp_guardarFoto_(ss, hoja);  // las X de hoy, para seguir viéndolas después de evaluar
+  evadiApp_promeLogCerrar_(ss, hoja, ayer ? ayer.fecha : evadiApp_hoy_(ss));  // Resultado final de ProMe
 
   var avisos = Evaluar(ayer ? { evadi: true, fila: ayer.fila, diasAtras: 1 } : { evadi: true });
   var partes = [ayer ? 'Se evaluó el ' + ayer.texto : 'Día evaluado'];
@@ -980,6 +1015,133 @@ function evadiApp_ayer_(ss, dc) {
     };
   }
   return null;
+}
+
+/* ==================== REGISTRO DE PROME ==================== */
+// Hoja oculta "ProMeLog": Fecha | ProMe | Resultado | Hora. Un renglón por día.
+// Resultado: Hecho, No me dio tiempo o No se hizo (este último lo pone Evaluar). Vacío = pendiente.
+
+/**
+ * Anota el texto del ProMe de un día (lo llama crearEventoProMe de EventosProMe.gs y el ProMe de mañana).
+ * fecha = Date o 'aaaa-mm-dd'. Si el día ya tenía resultado, lo respeta.
+ */
+function evadiAppProMeRegistrar(fecha, texto) {
+  try {
+    var ss = evadiApp_libro_();
+    var f = fecha instanceof Date ? Utilities.formatDate(fecha, ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd') : String(fecha);
+    evadiApp_promeLogEscribir_(ss, f, { texto: String(texto || '').trim() });
+    CacheService.getScriptCache().remove('evadiProMe_' + f);  // el renglón de arriba se recalcula
+  } catch (err) {
+    Logger.log('No se anotó el ProMe en el registro: ' + err);
+  }
+}
+
+/** Hoja del registro. Se crea sola, oculta. */
+function evadiApp_promeLogHoja_(ss) {
+  var sh = ss.getSheetByName(EVADIAPP_HOJA_PROMELOG);
+  if (!sh) {
+    sh = ss.insertSheet(EVADIAPP_HOJA_PROMELOG, ss.getSheets().length);
+    sh.getRange('A:A').setNumberFormat('@');
+    sh.getRange('D:D').setNumberFormat('@');
+    sh.getRange('A1:D1').setValues([['Fecha', 'ProMe', 'Resultado', 'Hora']]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+/** Renglón del registro para una fecha (aaaa-mm-dd), o -1. */
+function evadiApp_promeLogFila_(sh, fecha) {
+  var ultima = sh.getLastRow();
+  if (ultima < 2) return -1;
+  var fechas = sh.getRange(2, 1, ultima - 1, 1).getDisplayValues();
+  for (var i = fechas.length - 1; i >= 0; i--) {
+    if (String(fechas[i][0]).trim() === fecha) return i + 2;
+  }
+  return -1;
+}
+
+/** { fila, texto, resultado, hora } de una fecha, o null. */
+function evadiApp_promeLogLeer_(ss, fecha) {
+  var sh = ss.getSheetByName(EVADIAPP_HOJA_PROMELOG);
+  if (!sh) return null;
+  var f = evadiApp_promeLogFila_(sh, fecha);
+  if (f < 0) return null;
+  var v = sh.getRange(f, 1, 1, 4).getDisplayValues()[0];
+  return { fila: f, texto: v[1], resultado: v[2], hora: v[3] };
+}
+
+/**
+ * Crea o actualiza el renglón de una fecha. cambios = { texto, resultado, hora } (lo que no venga, no se toca).
+ * Los renglones quedan en orden de fecha.
+ */
+function evadiApp_promeLogEscribir_(ss, fecha, cambios) {
+  var sh = evadiApp_promeLogHoja_(ss);
+  var f = evadiApp_promeLogFila_(sh, fecha);
+  var fila = f > 0 ? sh.getRange(f, 1, 1, 4).getDisplayValues()[0] : [fecha, '', '', ''];
+  fila[0] = fecha;
+  if (cambios.texto !== undefined) fila[1] = cambios.texto;
+  if (cambios.resultado !== undefined) fila[2] = cambios.resultado;
+  if (cambios.hora !== undefined) fila[3] = cambios.hora;
+  if (f > 0) {
+    sh.getRange(f, 1, 1, 4).setValues([fila]);
+    return;
+  }
+  var ultima = sh.getLastRow();
+  var anterior = ultima >= 2 ? String(sh.getRange(ultima, 1).getDisplayValue()).trim() : '';
+  sh.getRange(ultima + 1, 1, 1, 4).setValues([fila]);
+  if (anterior && anterior > fecha) sh.getRange(2, 1, ultima, 4).sort(1);  // llegó un día anterior: reordenar
+}
+
+/** Índice del hábito de ProMe (el que empieza con PROME_ICONO), o -1. */
+function evadiApp_promeIndice_(hoja) {
+  if (EVADIAPP_PROME_IDX !== null) return EVADIAPP_PROME_IDX;
+  EVADIAPP_PROME_IDX = -1;
+  if (typeof PROME_ICONO === 'undefined') return -1;
+  var ic = evadiApp_icono_(PROME_ICONO);
+  var valores = hoja.getRange('A1:N18').getValues();
+  EVADIAPP.habitos.forEach(function (h, i) {
+    var p = evadiApp_pos_(h.texto);
+    if (evadiApp_icono_(valores[p.r][p.c]) === ic) EVADIAPP_PROME_IDX = i;
+  });
+  return EVADIAPP_PROME_IDX;
+}
+
+/**
+ * Cambió la casilla del hábito de ProMe: anota Resultado y Hora en el día que corresponde
+ * (hoy, o ayer si EvaDi todavía tiene ese día sin evaluar). Pendiente = Resultado y Hora vacíos.
+ */
+function evadiApp_promeLogMarca_(ss, dc, hecho, falle) {
+  try {
+    var fecha = evadiApp_hoy_(ss);
+    if (!dc.evaluado) {
+      var ay = evadiApp_ayer_(ss, dc);
+      if (ay) fecha = ay.fecha;
+    }
+    var res = hecho ? 'Hecho' : (falle ? 'No me dio tiempo' : '');
+    if (!res && !evadiApp_promeLogLeer_(ss, fecha)) return;  // pendiente y sin renglón: nada que anotar
+    var hora = res ? Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'HH:mm') : '';
+    evadiApp_promeLogEscribir_(ss, fecha, { resultado: res, hora: hora });
+  } catch (err) {
+    Logger.log('No se anotó el resultado de ProMe: ' + err);
+  }
+}
+
+/**
+ * Al evaluar: Resultado final del día según EvaDi. Si quedó pendiente, "No se hizo".
+ * La hora se queda como estaba.
+ */
+function evadiApp_promeLogCerrar_(ss, hoja, fecha) {
+  var i = evadiApp_promeIndice_(hoja);
+  if (i < 0) return;
+  try {
+    var h = EVADIAPP.habitos[i];
+    var hecho = hoja.getRange(h.hecho).getValue() === true;
+    var falle = h.falle ? hoja.getRange(h.falle).getValue() === true : false;
+    evadiApp_promeLogEscribir_(ss, fecha, { resultado: hecho ? 'Hecho' : (falle ? 'No me dio tiempo' : 'No se hizo') });
+  } catch (err) {
+    Logger.log('No se cerró el día de ProMe en el registro: ' + err);
+  }
 }
 
 /* ==================== CLOCKIFY: TIKTOK ==================== */
@@ -1164,10 +1326,21 @@ function evadiApp_habitosCalHoy_(ss, hoja) {
     if (!(estado[i] >= s)) estado[i] = s;
   });
 
+  // ProMe: "sin evento" solo es palomita si hoy sí había ProMe planeado (está en el registro)
+  var promeIdx = evadiApp_promeIndice_(hoja);
+  var promeReg = promeIdx >= 0 ? evadiApp_promeLogLeer_(ss, hoy) : null;
+  var promePlaneado = !!(promeReg && String(promeReg.texto).trim());
+
   var palomitas = 0, equis = 0, pendientes = 0;
   EVADIAPP.habitos.forEach(function (h, i) {
     if (h.texto === EVADIAPP_TIKTOK.celda) return;  // TikTok lo decide Clockify
     var s = estado[i] || 0;
+    if (i === promeIdx && s === 0 && !promePlaneado) {
+      evadiApp_marcar_(ss, hoja, i, 'hecho', false);
+      if (h.falle) evadiApp_marcar_(ss, hoja, i, 'falle', false);
+      pendientes++;
+      return;
+    }
     if (alReves[i]) {
       if (s === 0) { evadiApp_marcar_(ss, hoja, i, 'falle', true); equis++; }
       else { evadiApp_marcar_(ss, hoja, i, 'hecho', false); evadiApp_marcar_(ss, hoja, i, 'falle', false); pendientes++; }
@@ -1253,6 +1426,8 @@ function evadiAppHabitoBorrado(e) {
 
     var padres = {};
     var marcados = [];
+    var promeIdx = evadiApp_promeIndice_(hoja);
+    var promeQuitado = !!CacheService.getScriptCache().get('evadiProMeQuitado_' + hoy);
     var revisar = {};  // hábitos al revés que hay que volver a revisar
 
     cambios.forEach(function (it) {
@@ -1288,6 +1463,7 @@ function evadiAppHabitoBorrado(e) {
       }
       if (borrado) {
         if (fechaVieja !== hoy) return;  // solo cuenta borrar un evento de hoy
+        if (indice === promeIdx && promeQuitado) return;  // lo quitaste desde el renglón de ProMe: no es palomita
         evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
         marcados.push('palomita: ' + titulo);
         return;
@@ -1591,7 +1767,9 @@ function evadiApp_promeManana_(ss, diasAtras) {
       return ev.getTitle().indexOf(PROME_ETIQUETA) >= 0;
     });
     if (yaEsta) return 'ProMe ' + cual + ' ya estaba agendado.';
-    cal.createEvent(titulo + ' ' + PROME_ETIQUETA, inicio, new Date(inicio.getTime() + PROME_DURACION * 60000));
+    var icono = typeof PROME_ICONO !== 'undefined' ? PROME_ICONO + ' ' : '';
+    cal.createEvent(icono + titulo + ' ' + PROME_ETIQUETA, inicio, new Date(inicio.getTime() + PROME_DURACION * 60000));
+    evadiAppProMeRegistrar(inicio, titulo);
     if (diasAtras) CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '1', 120);  // renglón ProMe en verde
     return 'ProMe ' + cual + ' agendado';
   } catch (err) {
