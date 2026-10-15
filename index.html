@@ -59,7 +59,8 @@ button,input,select{font-family:inherit;color:inherit}
 .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;text-align:center}
 #rac{width:100%;height:36px;border:1px solid var(--borde-fondo);border-radius:var(--radio);padding:0 10px;font-size:16px;background:var(--blanco)}
-#estado{min-height:30px;text-align:center;font-size:14px;font-weight:700;line-height:20px;position:sticky;bottom:0;z-index:5;background:var(--fondo);padding:4px 0 6px;margin-bottom:-6px}
+#estado{height:30px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;text-align:center;font-size:14px;font-weight:700;line-height:20px;position:sticky;bottom:0;z-index:5;background:var(--fondo);padding:4px 0 0;border-bottom:6px solid var(--fondo);margin-bottom:-6px}
+#estado.abierto{height:auto;white-space:normal}
 #estado.e-ok{color:#2F6B12}
 #estado.e-info{color:var(--azul)}
 #estado.e-pend{color:#A44A0B}
@@ -312,8 +313,8 @@ function mostrarEstado(txt, error) {
   if (error) tipo = 'e-error';
   else if (/…$/.test(txt)) tipo = 'e-info';
   else if (/^Sin señal|^Sin conexión|pendiente/.test(txt)) tipo = 'e-pend';
-  e.className = txt ? tipo : '';
-  ajustarAlto(); // si un aviso largo ocupa dos renglones, la app se reacomoda para que siga cabiendo
+  e.className = txt ? tipo : '';  // también cierra el aviso abierto
+  // Alto fijo de un renglón: un aviso largo termina en "…" y se ve completo al tocarlo. Así no cambia el tamaño (en la PC brincaba el zoom)
 }
 
 // Texto de fondo: sin señal y cuántos cambios esperan
@@ -1004,6 +1005,7 @@ document.querySelectorAll('[data-cerrar]').forEach(function (b) {
 ['hh', 'hmm'].forEach(function (id) {
   $(id).addEventListener('input', function () { $('herr').style.display = 'none'; });
 });
+$('estado').addEventListener('click', function () { $('estado').classList.toggle('abierto'); });  // ver el aviso completo
 $('rac').addEventListener('click', abrirRac);
 $('rac').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirRac(); } });
 $('racok').addEventListener('click', guardarRac);
