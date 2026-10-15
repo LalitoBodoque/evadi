@@ -2,7 +2,7 @@
  * ProMe — un solo resultado
  * Al palomear la casilla B13 de la hoja "ProMe", crea el evento de hoy
  * en el calendario "🧕 Hábitos" usando el texto del resultado (D13),
- * con el ícono del hábito al inicio (❗) y la etiqueta [wpro] al final para poder buscarlo después.
+ * con el ícono del hábito al inicio (❗) y en color morado (Uva). El ícono es lo que lo identifica.
  * Luego regresa la casilla a FALSE.
  *
  * El ícono hace que el evento cuente como el hábito "❗ Hacer ProMe" en EvaDí:
@@ -18,8 +18,9 @@ var PROME_COL_TEXTO   = 4;         // columna D, donde vive el resultado
 var PROME_HORA        = 6;         // hora de inicio
 var PROME_MIN         = 30;        // minuto de inicio
 var PROME_DURACION    = 15;        // duración en minutos
-var PROME_ETIQUETA    = "[wpro]";  // etiqueta que se agrega al final del título
-var PROME_ICONO       = "❗";       // ícono del hábito en EvaDi (C5): va al inicio del título
+var PROME_ETIQUETA    = "[wpro]";  // ya no se agrega al título; solo sirve para reconocer eventos viejos
+var PROME_ICONO       = "❗";       // ícono del hábito en EvaDi (C5): va al inicio del título y lo identifica
+var PROME_COLOR       = "3";       // color del evento en Google Calendar: 3 = Uva (morado)
 
 // Calendario "🧕 Hábitos" (antes era el calendario propio de Eventos ProMe:
 // c126d209e000f66e72ffe0b857146e6e86e5053d05bbc4fb3ba5d7904fe76a1b@group.calendar.google.com)
@@ -57,10 +58,11 @@ function disparadorProMe(e) {
 }
 
 /**
- * Crea el evento de hoy en el calendario de ProMe, con el ícono al inicio y la etiqueta al final.
- * Además anota el texto en el registro ProMeLog.
+ * Crea el evento de ProMe de un día (hoy si no se indica), con el ícono al inicio y en color morado.
+ * Además lo anota en el registro ProMeLog y en la lista de eventos que usa el disparador de 🧕 Hábitos
+ * (así, si lo borras enseguida, igual cuenta como palomita).
  */
-function crearEventoProMe(titulo) {
+function crearEventoProMe(titulo, dia) {
   var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
 
   if (!cal) {
@@ -68,17 +70,20 @@ function crearEventoProMe(titulo) {
     return;
   }
 
-  var hoy = new Date();
-  var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), PROME_HORA, PROME_MIN, 0);
+  var base = dia instanceof Date ? dia : new Date();
+  var inicio = new Date(base.getFullYear(), base.getMonth(), base.getDate(), PROME_HORA, PROME_MIN, 0);
   var fin = new Date(inicio.getTime() + PROME_DURACION * 60 * 1000);
 
-  var tituloFinal = PROME_ICONO + " " + titulo + " " + PROME_ETIQUETA;
+  var tituloFinal = PROME_ICONO + " " + titulo;
 
-  cal.createEvent(tituloFinal, inicio, fin);
+  var ev = cal.createEvent(tituloFinal, inicio, fin);
+  ev.setColor(PROME_COLOR);
   Logger.log("Evento creado: " + tituloFinal + " a las " + inicio);
 
-  // Registro para la sesión semanal (vive en AppEvaDi.gs)
+  // Registro para la sesión semanal y lista del disparador (viven en AppEvaDi.gs)
   if (typeof evadiAppProMeRegistrar === "function") evadiAppProMeRegistrar(inicio, titulo);
+  if (typeof evadiAppHabListaAgregar === "function") evadiAppHabListaAgregar(ev);
+  return ev;
 }
 
 /**
@@ -96,6 +101,6 @@ function pruebaEventoProMe() {
   var inicio = new Date(new Date().getTime() + 5 * 60 * 1000);
   var fin = new Date(inicio.getTime() + 15 * 60 * 1000);
 
-  cal.createEvent("PRUEBA ProMe " + PROME_ETIQUETA, inicio, fin);
+  cal.createEvent("PRUEBA ProMe", inicio, fin);
   Logger.log("Evento de prueba creado en: " + cal.getName());
 }

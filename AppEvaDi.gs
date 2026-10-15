@@ -37,7 +37,8 @@
  *   Si lo resuelves de las 5:00 en adelante, la app vuelve a leer tu calendario de hoy (como Check hábitos).
  * - Evaluar desde la casilla M18 de la hoja pasa por aquí (evadiAppEvaluarDesdeHoja): mismo candado y mismas reglas.
  * - Exentar también quita las X de los hábitos que quedan palomeados.
- * - ProMe: el evento vive en "🧕 Hábitos" con el ícono ❗ (EventosProMe.gs) y cuenta como el hábito "❗ Hacer ProMe".
+ * - ProMe: el evento vive en "🧕 Hábitos" con el ícono ❗ y color morado (EventosProMe.gs) y cuenta como el hábito "❗ Hacer ProMe".
+ *   El ícono es lo que lo identifica (la etiqueta [wpro] ya no se usa; solo se reconoce en eventos viejos).
  *   Registro en la hoja oculta "ProMeLog" (Fecha | ProMe | Resultado | Hora) para la sesión semanal:
  *   el texto se anota al crear el evento; Resultado y Hora cuando cambia la casilla del hábito;
  *   al evaluar se cierra el día ("No se hizo" si quedó pendiente).
@@ -771,16 +772,78 @@ function evadiApp_promeQuitar_(ss, fecha) {
   var reg = evadiApp_promeLogLeer_(ss, hoy);
   if (reg && reg.resultado) return 'Primero quítale la palomita o la X al hábito de ProMe: hoy ya está marcado (' + reg.resultado + ').';
 
-  var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
-  if (!cal) throw new Error('No encontré el calendario de ProMe.');
+  // Hoy ya no hay ProMe planeado: se borra su renglón del registro
+  if (reg) {
+    var sh = evadiApp_promeLogHoja_(ss);
+    sh.getRange(reg.fila, 1, 1, 4).clearContent();
+    try { sh.deleteRow(reg.fila); } catch (err) { /* si no se puede borrar, queda vacío y no cuenta */ }
+  }
+
+  // Se recuerdan los eventos que quitaste aquí: el disparador del calendario no los cuenta como palomita
   var cache = CacheService.getScriptCache();
-  cache.put('evadiProMeQuitado_' + hoy, '1', 600);  // el disparador del calendario no lo cuenta como palomita
-  cal.getEventsForDay(new Date()).forEach(function (ev) {
-    if (ev.getTitle().indexOf(PROME_ETIQUETA) >= 0) ev.deleteEvent();
+  var quitados = evadiApp_promeQuitados_();
+  evadiApp_promeEventosHoy_().forEach(function (ev) {
+    quitados.push(String(ev.getId()).replace(/@google\.com$/, ''));
+    ev.deleteEvent();
   });
-  if (reg) evadiApp_promeLogHoja_(ss).deleteRow(reg.fila);  // hoy ya no hay ProMe planeado
+  cache.put('evadiProMeQuitados', JSON.stringify(quitados.slice(-50)), 21600);
   cache.put('evadiProMe_' + hoy, '0', 120);
   return '';
+}
+
+/** Ids de los eventos de ProMe que quitaste desde el renglón de arriba (6 horas). */
+function evadiApp_promeQuitados_() {
+  try {
+    var l = JSON.parse(CacheService.getScriptCache().get('evadiProMeQuitados') || '[]');
+    return Array.isArray(l) ? l : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+/** ¿Es un evento de ProMe? Por el ícono al inicio (o la etiqueta [wpro] de los eventos viejos). */
+function evadiApp_esEventoProMe_(titulo) {
+  var t = String(titulo || '');
+  if (typeof PROME_ETIQUETA !== 'undefined' && t.indexOf(PROME_ETIQUETA) >= 0) return true;
+  return typeof PROME_ICONO !== 'undefined' && evadiApp_icono_(t) === evadiApp_icono_(PROME_ICONO);
+}
+
+/**
+ * Agrega un evento recién creado a la lista que usa el disparador de 🧕 Hábitos
+ * (Calendar no dice el título de un evento borrado; si lo borras antes de que el disparador lo vea, así sí cuenta).
+ */
+function evadiAppHabListaAgregar(ev) {
+  try {
+    var ss = evadiApp_libro_();
+    var lista = evadiApp_habCalLeerLista_();
+    var id = String(ev.getId()).replace(/@google\.com$/, '');
+    lista[id] = {
+      t: String(ev.getTitle()).slice(0, 80),
+      f: Utilities.formatDate(ev.getStartTime(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')
+    };
+    PropertiesService.getScriptProperties().setProperty(EVADIAPP_PROP_HAB_LISTA, JSON.stringify(lista));
+  } catch (err) {
+    Logger.log('No se agregó el evento a la lista de hábitos: ' + err);
+  }
+}
+
+/**
+ * Eventos de ProMe de hoy (los que empiezan con el ícono ❗).
+ */
+function evadiApp_promeEventosHoy_() {
+  var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
+  if (!cal) throw new Error('No encontré el calendario de ProMe.');
+  return cal.getEventsForDay(new Date()).filter(function (ev) {
+    return evadiApp_esEventoProMe_(ev.getTitle());
+  });
+}
+
+/** Texto del ProMe dentro del título de su evento (sin el ícono ni la etiqueta vieja). */
+function evadiApp_promeTextoEvento_(titulo) {
+  var t = String(titulo || '');
+  if (typeof PROME_ETIQUETA !== 'undefined') t = t.replace(PROME_ETIQUETA, '');
+  if (typeof PROME_ICONO !== 'undefined') t = t.replace(PROME_ICONO, '');
+  return t.replace(/[\uFE0E\uFE0F]/g, '').trim();
 }
 
 /**
@@ -805,7 +868,7 @@ function evadiApp_promeAgendado_(ss, fresco) {
     var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
     if (cal) {
       si = cal.getEventsForDay(new Date()).some(function (ev) {
-        return ev.getTitle().indexOf(PROME_ETIQUETA) >= 0;
+        return evadiApp_esEventoProMe_(ev.getTitle());
       });
     }
   } catch (err) {
@@ -822,15 +885,25 @@ function evadiApp_promeAgendado_(ss, fresco) {
  */
 function evadiApp_prome_(ss, fecha) {
   if (typeof crearEventoProMe !== 'function') throw new Error('No encontré EventosProMe.gs en el proyecto.');
-  if (String(fecha || '') !== evadiApp_hoy_(ss)) return 'El ProMe de otro día no se agendó.';
-  if (evadiApp_promeAgendado_(ss, true)) return 'ProMe ya estaba agendado hoy.';
+  var hoy = evadiApp_hoy_(ss);
+  if (String(fecha || '') !== hoy) return 'El ProMe de otro día no se agendó.';
+  var cache = CacheService.getScriptCache();
+
+  // Ya hay evento hoy: no se duplica, solo se asegura que esté en el registro
+  var eventos = evadiApp_promeEventosHoy_();
+  if (eventos.length) {
+    var reg = evadiApp_promeLogLeer_(ss, hoy);
+    if (!reg || !String(reg.texto).trim()) evadiAppProMeRegistrar(hoy, evadiApp_promeTextoEvento_(eventos[0].getTitle()));
+    cache.put('evadiProMe_' + hoy, '1', 120);
+    return 'ProMe ya estaba agendado hoy.';
+  }
 
   var sh = ss.getSheetByName(PROME_HOJA);
   var titulo = String(sh.getRange(PROME_FILA, PROME_COL_TEXTO).getValue()).trim();
   if (titulo === '') return 'El resultado de Hoy en ProMe está vacío.';
 
   crearEventoProMe(titulo);  // también lo anota en el registro
-  CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '1', 120);
+  cache.put('evadiProMe_' + hoy, '1', 120);
   return 'ProMe de hoy agendado: ' + titulo;
 }
 
@@ -1427,7 +1500,8 @@ function evadiAppHabitoBorrado(e) {
     var padres = {};
     var marcados = [];
     var promeIdx = evadiApp_promeIndice_(hoja);
-    var promeQuitado = !!CacheService.getScriptCache().get('evadiProMeQuitado_' + hoy);
+    var quitados = {};  // eventos de ProMe que quitaste desde el renglón de arriba
+    evadiApp_promeQuitados_().forEach(function (id) { quitados[id] = true; });
     var revisar = {};  // hábitos al revés que hay que volver a revisar
 
     cambios.forEach(function (it) {
@@ -1463,7 +1537,7 @@ function evadiAppHabitoBorrado(e) {
       }
       if (borrado) {
         if (fechaVieja !== hoy) return;  // solo cuenta borrar un evento de hoy
-        if (indice === promeIdx && promeQuitado) return;  // lo quitaste desde el renglón de ProMe: no es palomita
+        if (quitados[it.id]) return;  // lo quitaste desde el renglón de ProMe: no es palomita
         evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
         marcados.push('palomita: ' + titulo);
         return;
@@ -1762,14 +1836,12 @@ function evadiApp_promeManana_(ss, diasAtras) {
     var cal = CalendarApp.getCalendarById(PROME_CALENDARIO_ID);
     if (!cal) return 'No encontré el calendario de ProMe.';
     var hoy = new Date();
-    var inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1 - diasAtras, PROME_HORA, PROME_MIN, 0);
-    var yaEsta = cal.getEventsForDay(inicio).some(function (ev) {
-      return ev.getTitle().indexOf(PROME_ETIQUETA) >= 0;
+    var dia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1 - diasAtras);
+    var yaEsta = cal.getEventsForDay(dia).some(function (ev) {
+      return evadiApp_esEventoProMe_(ev.getTitle());
     });
     if (yaEsta) return 'ProMe ' + cual + ' ya estaba agendado.';
-    var icono = typeof PROME_ICONO !== 'undefined' ? PROME_ICONO + ' ' : '';
-    cal.createEvent(icono + titulo + ' ' + PROME_ETIQUETA, inicio, new Date(inicio.getTime() + PROME_DURACION * 60000));
-    evadiAppProMeRegistrar(inicio, titulo);
+    crearEventoProMe(titulo, dia);  // ícono, color morado, registro y lista del disparador
     if (diasAtras) CacheService.getScriptCache().put('evadiProMe_' + evadiApp_hoy_(ss), '1', 120);  // renglón ProMe en verde
     return 'ProMe ' + cual + ' agendado';
   } catch (err) {
