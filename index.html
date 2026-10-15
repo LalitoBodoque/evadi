@@ -95,6 +95,13 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     <span style="font-size:14px;font-weight:600">Hay versión nueva</span>
     <button class="bb" id="actualizar" style="padding:0 14px">Actualizar</button>
   </div>
+  <div id="ayerp" class="tl ri" style="display:none;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px 6px 12px">
+    <span id="ayertx" style="font-size:14px;font-weight:700;line-height:1.25;min-width:0"></span>
+    <span style="display:flex;gap:6px;flex:none">
+      <button class="bb" data-boton="evaluarAyer" style="height:36px;padding:0 10px">Evaluar</button>
+      <button class="bb" data-boton="descartarAyer" style="height:36px;padding:0 10px">Descartar</button>
+    </span>
+  </div>
   <div id="cargando">Cargando…</div>
   <div id="contenido" style="display:none;flex-direction:column;gap:7px">
     <div class="ok" id="sbox" style="border-radius:var(--radio);padding:8px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px">
@@ -260,7 +267,10 @@ var CLAVE_CONF = 'evadiApp_conf';
 
 var CONF = {
   evaluar: { t: '¿Seguro que quieres evaluar el día?', d: 'Pasa tus hábitos, tiempo y Relevante a Cal, y crea los eventos de mañana: ejercicio y ProMe (con el texto de ProMe Hoy). Tus palomitas y X se quedan a la vista hasta medianoche.', b: 'Sí, evaluar' },
-  exentar: { t: '¿Seguro que quieres exentar el día?', d: 'Marca todos tus hábitos como hechos (menos Santa Brígida) y pone la meta de tiempo en 0.', b: 'Sí, exentar' }
+  exentar: { t: '¿Seguro que quieres exentar el día?', d: 'Marca todos tus hábitos como hechos (menos Santa Brígida) y pone la meta de tiempo en 0.', b: 'Sí, exentar' },
+  // Día anterior sin evaluar (%d = "miércoles 14")
+  evaluarAyer: { t: '¿Evaluar el %d?', d: 'Pasa lo que ves en pantalla al renglón del %d en Cal y deja la pantalla limpia para hoy. El ejercicio y el ProMe se agendan para hoy.', b: 'Sí, evaluar' },
+  descartarAyer: { t: '¿Descartar el %d?', d: 'Limpia la pantalla para hoy sin pasar nada a Cal. El %d se queda vacío.', b: 'Sí, descartar' }
 };
 
 function $(id) { return document.getElementById(id); }
@@ -291,7 +301,7 @@ function nuevoId() { return Date.now().toString(36) + Math.random().toString(36)
 
 /* ==================== MENSAJES ==================== */
 
-function esError(t) { return /^Error|No se encontr|No puede|Clockify|No se guard|descart|ocupada|No lleg/.test(t || ''); }
+function esError(t) { return /^Error|^Primero|No se encontr|No puede|Clockify|No se guard|No se cre|descartaron|ocupada|No lleg/.test(t || ''); }
 
 // Color según lo que pasa: verde listo, azul trabajando, naranja sin señal o pendiente, rojo error
 function mostrarEstado(txt, error) {
@@ -445,7 +455,7 @@ function marcarSinSenal() {
 function encolar(op, txt) {
   if (!E) return;
   op.id = nuevoId();
-  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota') op.dia = E.dia;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota') { op.dia = E.dia; op.ymd = hoyLocal(); }
   var cola = leerCola();
   cola.push(op);
   guardarCola(cola);
@@ -460,8 +470,9 @@ function encolar(op, txt) {
 // Hace en pantalla lo mismo que hará Apps Script con ese cambio
 function aplicarLocal(estado, op) {
   if (!estado || !op) return;
-  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota' && op.dia && estado.dia && op.dia !== estado.dia) return;
-  var h = estado.habitos ? estado.habitos[op.indice] : null;
+  if (op.tipo !== 'tome' && op.tipo !== 'prome' && op.tipo !== 'escalera' && op.tipo !== 'nota' && op.dia && estado.dia && op.dia !== estado.dia &&
+      !(estado.ayer && op.ymd === estado.ayer.fecha)) return;  // de ayer sin evaluar: EvaDi todavía tiene ese día
+  var h =estado.habitos ? estado.habitos[op.indice] : null;
   switch (op.tipo) {
     case 'marcar':
       if (!h) return;
@@ -643,10 +654,12 @@ function guardarEscalera() {
 // Botones que necesitan la hoja: apagados sin señal o mientras algo se guarda
 function pintarControles() {
   var evd = !!(E && E.evaluado);
+  var ayr = !!(E && E.ayer);
   document.querySelectorAll('[data-boton]').forEach(function (b) {
     var n = b.getAttribute('data-boton');
     b.disabled = corriendoBoton || !!botonEnEspera || sinSenal || !E ||
-      (evd && (n === 'check' || n === 'tiempoHoy' || n === 'exentar'));
+      (evd && (n === 'check' || n === 'tiempoHoy' || n === 'exentar')) ||
+      (ayr && (n === 'check' || n === 'tiempoHoy'));
   });
   // Día evaluado: botón Evaluar en verde y aviso junto a "Hábitos de hoy"
   var ev = !!(E && E.evaluado);
@@ -654,8 +667,15 @@ function pintarControles() {
   be.classList.toggle('evd', ev);
   be.textContent = ev ? '✓ Evaluado' : 'Evaluar';
   var th = $('thab');
-  th.textContent = ev ? 'Hábitos de hoy · ya evaluado' : 'Hábitos de hoy';
+  th.textContent = ev ? 'Hábitos de hoy · ya evaluado' : (ayr ? 'Hábitos del ' + E.ayer.texto : 'Hábitos de hoy');
   th.style.color = ev ? 'var(--ok-tx)' : '';
+}
+
+// Franja del día anterior sin evaluar: lo que se ve en pantalla todavía es de ese día
+function pintarAyer() {
+  var a = E && E.ayer;
+  $('ayerp').style.display = a ? 'flex' : 'none';
+  if (a) $('ayertx').textContent = 'Sin evaluar: ' + a.texto;
 }
 
 function render(estado, deCache) {
@@ -663,7 +683,8 @@ function render(estado, deCache) {
   $('cargando').style.display = 'none';
   $('contenido').style.display = 'flex';
   if (!deCache) guardarCache(estado);
-  $('fecha').textContent = '· ' + E.fecha.dia + ' ' + E.fecha.numero + ' de ' + String(E.fecha.mes || '').toLowerCase();
+  $('fecha').textContent = '· ' + (E.ayer ? E.ayer.corto : E.fecha.dia + ' ' + E.fecha.numero + ' de ' + String(E.fecha.mes || '').toLowerCase());
+  pintarAyer();
 
   var cont = $('habs');
   cont.innerHTML = '';
@@ -900,9 +921,11 @@ function pedirBoton(nombre) {
   if (CONF[nombre]) {
     accion = nombre;
     if (E.evaluado) { mostrarEstado('Hoy ya evaluaste. Lo que corrijas se guarda directo en Cal.'); return; }
-    var c = CONF[nombre];
-    $('ctit').textContent = c.t;
-    $('cdes').textContent = c.d;
+    // Con un día anterior sin evaluar, el botón Evaluar evalúa ese día
+    var c = CONF[nombre === 'evaluar' && E.ayer ? 'evaluarAyer' : nombre];
+    var dia = E.ayer ? E.ayer.texto : '';
+    $('ctit').textContent = c.t.replace(/%d/g, dia);
+    $('cdes').textContent = c.d.replace(/%d/g, dia);
     $('cok').textContent = c.b;
     abrir('conf');
   } else {
