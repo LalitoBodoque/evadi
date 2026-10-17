@@ -20,8 +20,9 @@
  * - Después de evaluar: muestra el día desde Cal (palomitas, tiempo, meta, Relevante) y las X desde una foto;
  *   lo que corrijas va directo a Cal. No deja evaluar dos veces el mismo día.
  * - Al evaluar, agenda el ProMe de mañana con el texto de ProMe Hoy.
- * - Calendario "🧕 Hábitos": al borrar un evento de HOY, palomea el hábito cuyo ícono coincide
- *   con el primer "palabra" del título (disparador de calendario + servicio avanzado de Calendar).
+ * - Calendario "🧕 Hábitos": al borrar un evento de HOY (o moverlo a otro día), palomea el hábito cuyo
+ *   ícono coincide con el primer "palabra" del título (disparador de calendario + servicio avanzado de Calendar).
+ *   Al actualizar desde la app (↻, abrir o regresar) también se revisan esos cambios, sin esperar al disparador.
  *   Si el título de un evento de HOY termina en [C] (lo marcaste como hecho en CalenGoo = no me dio tiempo),
  *   le pone X; si le quitas el [C], o si el evento vuelve a aparecer hoy, regresa a pendiente.
  *   Los hábitos de EVADIAPP_HAB_AL_REVES (hoy ninguno) funcionan al revés: borrar = X; si vuelve = pendiente.
@@ -333,6 +334,17 @@ function evadiApp_sincronizar_(ops, boton, fresco) {
     var hoja = ss.getSheetByName(EVADIAPP.hoja);
     if (!hoja) throw new Error('No encontré la pestaña EvaDi.');
     var avisos = [];
+
+    // 0) Al actualizar a mano (↻, abrir o regresar a la app): revisa ya los cambios del calendario
+    //    "🧕 Hábitos" sin esperar el disparador de Google, que a veces tarda.
+    //    Va antes de los pendientes para que lo que tocaste en la app gane.
+    if (fresco && !boton) {
+      try {
+        evadiApp_habCalProcesar_(ss, true);
+      } catch (err) {
+        Logger.log('No pude revisar el calendario de hábitos: ' + String((err && err.message) || err));
+      }
+    }
 
     // 1) Cambios de la fila de pendientes, en el orden en que se hicieron
     if (ops.length) evadiApp_aplicarCola_(ss, hoja, ops, avisos);
@@ -1468,114 +1480,136 @@ function evadiApp_revisarAlReves_(ss, hoja, indices, lista, buscar) {
 /**
  * Disparador del calendario "🧕 Hábitos". Se activa con cualquier cambio en ese calendario.
  * - Hábito normal: si se borró su evento de HOY, le pone palomita.
+ *   Si su evento de HOY se movió a otro día, también le pone palomita (igual que borrarlo).
  *   Si a su evento de HOY se le agregó [C] al final (CalenGoo), le pone X; si se le quitó, pendiente.
  *   Si su evento vuelve a aparecer hoy (restaurado, creado o movido a hoy), regresa a pendiente.
  *   (Santa Brígida no tiene X: con [C] solo se le quita la palomita.)
  * - Hábito al revés (Pes): si su evento de hoy se creó, se borró o se movió, revisa si hoy
  *   existe: no = X; sí = pendiente.
  * Si el día ya se evaluó, la marca va a Cal (lo hace evadiApp_marcar_).
+ * La revisión vive en evadiApp_habCalProcesar_: el botón ↻ de la app la corre también,
+ * así no hay que esperar a que Google dispare este aviso (a veces tarda).
  */
 function evadiAppHabitoBorrado(e) {
   var candado = LockService.getScriptLock();
   if (!candado.tryLock(30000)) return;  // ocupado: los cambios se revisan en el siguiente disparo
   try {
-    var ss = evadiApp_libro_();
-    var hoja = ss.getSheetByName(EVADIAPP.hoja);
-    if (!hoja) return;
-    var tz = ss.getSpreadsheetTimeZone();
-    var hoy = evadiApp_hoy_(ss);
-    var buscar = evadiApp_buscadorIconos_(hoja);
-    var alReves = evadiApp_habAlReves_();
-    var lista = evadiApp_habCalLeerLista_();
-    var cambios = evadiApp_habCalCambios_();
-
-    // EvaDi todavía tiene el día anterior sin evaluar: no se marca nada
-    // (al evaluarlo o descartarlo de día, la app vuelve a leer el calendario de hoy)
-    if (evadiApp_ayer_(ss)) {
-      evadiApp_habCalGuardarLista_(ss);
-      Logger.log('Calendario de hábitos en pausa: falta evaluar o descartar el día anterior.');
-      return;
-    }
-
-    var padres = {};
-    var marcados = [];
-    var promeIdx = evadiApp_promeIndice_(hoja);
-    var quitados = {};  // eventos de ProMe que quitaste desde el renglón de arriba
-    evadiApp_promeQuitados_().forEach(function (id) { quitados[id] = true; });
-    var revisar = {};  // hábitos al revés que hay que volver a revisar
-
-    cambios.forEach(function (it) {
-      if (!it || !it.id) return;
-      var borrado = it.status === 'cancelled';
-      var guardado = lista[it.id] || null;
-
-      // Título: del evento si sigue vivo; si se borró, de la lista guardada o de la serie ("papá")
-      var titulo = !borrado && it.summary ? String(it.summary) : (guardado ? guardado.t : '');
-      if (!titulo && it.recurringEventId) {
-        if (!(it.recurringEventId in padres)) {
-          try {
-            padres[it.recurringEventId] = String(Calendar.Events.get(EVADIAPP_CAL_HABITOS, it.recurringEventId).summary || '');
-          } catch (err) {
-            padres[it.recurringEventId] = '';
-          }
-        }
-        titulo = padres[it.recurringEventId];
-      }
-      if (!titulo) return;
-
-      var indice = buscar(titulo);
-      if (indice < 0) return;  // no es de un hábito (ej. la línea -----)
-
-      // Fecha de la repetición borrada o, si no es repetición, la que tenía en la lista
-      var fechaVieja = it.originalStartTime ? evadiApp_habCalFecha_(it.originalStartTime, tz) : (guardado ? guardado.f : '');
-      var fechaNueva = !borrado && it.start && !it.recurrence ? evadiApp_habCalFecha_(it.start, tz) : '';
-
-      if (alReves[indice]) {
-        // Se creó, se borró o se movió algo de hoy: al final se revisa si existe
-        if (fechaVieja === hoy || fechaNueva === hoy) revisar[indice] = true;
-        return;
-      }
-      if (borrado) {
-        if (fechaVieja !== hoy) return;  // solo cuenta borrar un evento de hoy
-        if (quitados[it.id]) return;  // lo quitaste desde el renglón de ProMe: no es palomita
-        evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
-        marcados.push('palomita: ' + titulo);
-        return;
-      }
-
-      // Evento vivo de hoy: ¿se le agregó o se le quitó el [C] de CalenGoo?
-      if (fechaNueva !== hoy && fechaVieja !== hoy) return;
-      var conC = evadiApp_tieneC_(titulo);
-      var antesC = guardado ? evadiApp_tieneC_(guardado.t) : false;
-      var tieneX = !!EVADIAPP.habitos[indice].falle;
-      if (conC && !antesC) {
-        if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', true);
-        else evadiApp_marcar_(ss, hoja, indice, 'hecho', false);
-        marcados.push((tieneX ? 'X: ' : 'sin palomita: ') + titulo);
-      } else if (!conC && antesC) {
-        if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', false);
-        marcados.push('pendiente: ' + titulo);
-      } else if (!conC && fechaNueva === hoy && (!guardado || guardado.f !== hoy)) {
-        // El evento volvió a aparecer hoy (lo restauraste, lo creaste o lo moviste a hoy): deshace el borrado
-        evadiApp_marcar_(ss, hoja, indice, 'hecho', false);
-        if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', false);
-        marcados.push('pendiente (volvió): ' + titulo);
-      }
-    });
-
-    // Lista nueva de hoy y mañana (sirve para el próximo borrado y para los hábitos al revés)
-    var nueva = evadiApp_habCalGuardarLista_(ss);
-
-    marcados = marcados.concat(evadiApp_revisarAlReves_(ss, hoja, Object.keys(revisar), nueva, buscar));
-
-    if (marcados.length) {
-      SpreadsheetApp.flush();
-      evadiApp_subirVer_();  // el cel y la PC se actualizan en segundos
-      Logger.log('Calendario de hábitos: ' + marcados.join(' | '));
-    }
+    evadiApp_habCalProcesar_(evadiApp_libro_(), false);
   } finally {
     candado.releaseLock();
   }
+}
+
+/**
+ * Revisa lo que cambió en "🧕 Hábitos" desde la última vez y marca los hábitos.
+ * Se llama ya con el candado tomado (desde el disparador o desde la app).
+ * soloSiHay = true: si Calendar no trae cambios, no hace nada más (más rápido para la app).
+ * Devuelve cuántas marcas puso.
+ */
+function evadiApp_habCalProcesar_(ss, soloSiHay) {
+  var hoja = ss.getSheetByName(EVADIAPP.hoja);
+  if (!hoja) return 0;
+  var cambios = evadiApp_habCalCambios_();
+  if (soloSiHay && !cambios.length) return 0;
+
+  var tz = ss.getSpreadsheetTimeZone();
+  var hoy = evadiApp_hoy_(ss);
+  var buscar = evadiApp_buscadorIconos_(hoja);
+  var alReves = evadiApp_habAlReves_();
+  var lista = evadiApp_habCalLeerLista_();
+
+  // EvaDi todavía tiene el día anterior sin evaluar: no se marca nada
+  // (al evaluarlo o descartarlo de día, la app vuelve a leer el calendario de hoy)
+  if (evadiApp_ayer_(ss)) {
+    evadiApp_habCalGuardarLista_(ss);
+    Logger.log('Calendario de hábitos en pausa: falta evaluar o descartar el día anterior.');
+    return 0;
+  }
+
+  var padres = {};
+  var marcados = [];
+  var quitados = {};  // eventos de ProMe que quitaste desde el renglón de arriba
+  evadiApp_promeQuitados_().forEach(function (id) { quitados[id] = true; });
+  var revisar = {};  // hábitos al revés que hay que volver a revisar
+
+  cambios.forEach(function (it) {
+    if (!it || !it.id) return;
+    var borrado = it.status === 'cancelled';
+    var guardado = lista[it.id] || null;
+
+    // Título: del evento si sigue vivo; si se borró, de la lista guardada o de la serie ("papá")
+    var titulo = !borrado && it.summary ? String(it.summary) : (guardado ? guardado.t : '');
+    if (!titulo && it.recurringEventId) {
+      if (!(it.recurringEventId in padres)) {
+        try {
+          padres[it.recurringEventId] = String(Calendar.Events.get(EVADIAPP_CAL_HABITOS, it.recurringEventId).summary || '');
+        } catch (err) {
+          padres[it.recurringEventId] = '';
+        }
+      }
+      titulo = padres[it.recurringEventId];
+    }
+    if (!titulo) return;
+
+    var indice = buscar(titulo);
+    if (indice < 0) return;  // no es de un hábito (ej. la línea -----)
+
+    // Fecha de la repetición borrada o, si no es repetición, la que tenía en la lista
+    var fechaVieja = it.originalStartTime ? evadiApp_habCalFecha_(it.originalStartTime, tz) : (guardado ? guardado.f : '');
+    var fechaNueva = !borrado && it.start && !it.recurrence ? evadiApp_habCalFecha_(it.start, tz) : '';
+
+    if (alReves[indice]) {
+      // Se creó, se borró o se movió algo de hoy: al final se revisa si existe
+      if (fechaVieja === hoy || fechaNueva === hoy) revisar[indice] = true;
+      return;
+    }
+    if (borrado) {
+      if (fechaVieja !== hoy) return;  // solo cuenta borrar un evento de hoy
+      if (quitados[it.id]) return;  // lo quitaste desde el renglón de ProMe: no es palomita
+      evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
+      marcados.push('palomita: ' + titulo);
+      return;
+    }
+
+    // Evento que estaba hoy (en la lista guardada) y lo moviste a otro día: cuenta como borrarlo
+    if (fechaNueva && fechaNueva !== hoy && guardado && guardado.f === hoy) {
+      if (quitados[it.id]) return;
+      evadiApp_marcar_(ss, hoja, indice, 'hecho', true);
+      marcados.push('palomita (movido al ' + fechaNueva + '): ' + titulo);
+      return;
+    }
+
+    // Evento vivo de hoy: ¿se le agregó o se le quitó el [C] de CalenGoo?
+    if (fechaNueva !== hoy && fechaVieja !== hoy) return;
+    var conC = evadiApp_tieneC_(titulo);
+    var antesC = guardado ? evadiApp_tieneC_(guardado.t) : false;
+    var tieneX = !!EVADIAPP.habitos[indice].falle;
+    if (conC && !antesC) {
+      if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', true);
+      else evadiApp_marcar_(ss, hoja, indice, 'hecho', false);
+      marcados.push((tieneX ? 'X: ' : 'sin palomita: ') + titulo);
+    } else if (!conC && antesC) {
+      if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', false);
+      marcados.push('pendiente: ' + titulo);
+    } else if (!conC && fechaNueva === hoy && (!guardado || guardado.f !== hoy)) {
+      // El evento volvió a aparecer hoy (lo restauraste, lo creaste o lo moviste a hoy): deshace el borrado
+      evadiApp_marcar_(ss, hoja, indice, 'hecho', false);
+      if (tieneX) evadiApp_marcar_(ss, hoja, indice, 'falle', false);
+      marcados.push('pendiente (volvió): ' + titulo);
+    }
+  });
+
+  // Lista nueva de hoy y mañana (sirve para el próximo borrado y para los hábitos al revés)
+  var nueva = evadiApp_habCalGuardarLista_(ss);
+
+  marcados = marcados.concat(evadiApp_revisarAlReves_(ss, hoja, Object.keys(revisar), nueva, buscar));
+
+  if (marcados.length) {
+    SpreadsheetApp.flush();
+    evadiApp_subirVer_();  // el cel y la PC se actualizan en segundos
+    Logger.log('Calendario de hábitos: ' + marcados.join(' | '));
+  }
+  return marcados.length;
 }
 
 /**

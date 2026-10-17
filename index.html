@@ -264,6 +264,8 @@ var corriendoBoton = false;   // un botón (Evaluar, Check hábitos...) se está
 var botonEnEspera = null;     // botón tocado mientras se actualizaba: corre al terminar
 var sinSenal = navigator.onLine === false;
 var otraVez = false;          // se pidió sincronizar mientras otra iba en camino
+var recargaPendiente = false; // tocaste ↻ mientras otra petición iba en camino: corre al terminar
+var vuelo = null;             // la petición en camino ({ cancelable, cancelado, ctrl })
 var ultimoTxt = '';           // texto a mostrar cuando se guarden los cambios
 var tSync = null;
 var modoHM = null;
@@ -337,9 +339,9 @@ function lineaBase() {
 /* ==================== RED ==================== */
 
 // Manda una petición a Apps Script. Rechaza con {tipo:'red'|'clave'|'servidor', msg}
-function pedir(cuerpo, ms) {
+function pedir(cuerpo, ms, ctrlFuera) {
   var conf = leerConf();
-  var ctrl = window.AbortController ? new AbortController() : null;
+  var ctrl = ctrlFuera || (window.AbortController ? new AbortController() : null);
   var reloj = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms);
   cuerpo.clave = conf.clave;
   return fetch(conf.url, {
@@ -387,12 +389,18 @@ function sincronizar(opts) {
   var envio = leerCola();
   var estabaSinSenal = sinSenal;
   enVuelo = true;
+  if (!opts.silencioso) recargaPendiente = false;  // esta ya trae todo fresco
+  // Solo se puede cortar si no lleva cambios ni botón (así ↻ no espera a una actualización atorada)
+  var yo = { cancelable: !opts.boton && !envio.length, cancelado: false, ctrl: window.AbortController ? new AbortController() : null };
+  vuelo = yo;
   if (opts.boton) corriendoBoton = true;
   pintarControles();
   if (opts.boton) mostrarEstado('Trabajando…');
   else if (!opts.silencioso || envio.length) mostrarEstado(envio.length ? 'Guardando…' : 'Actualizando…');
 
-  pedir({ ops: envio, boton: opts.boton || '', fresco: !!opts.fresco || !opts.silencioso }, opts.boton ? 120000 : 30000).then(function (d) {
+  pedir({ ops: envio, boton: opts.boton || '', fresco: !!opts.fresco || !opts.silencioso }, opts.boton ? 120000 : 30000, yo.ctrl).then(function (d) {
+    if (yo.cancelado) return;  // la cortó ↻: ya va otra en camino
+    vuelo = null;
     enVuelo = false;
     corriendoBoton = false;
     sinSenal = false;
@@ -408,7 +416,7 @@ function sincronizar(opts) {
     resto.forEach(function (o) { aplicarLocal(nuevo, o); });
     render(nuevo);
 
-    var faltan = resto.length > 0 || otraVez || !!botonEnEspera;
+    var faltan = resto.length > 0 || otraVez || !!botonEnEspera || recargaPendiente;
     if (aviso) mostrarEstado(aviso, esError(aviso));
     else if (faltan && (envio.length || resto.length)) mostrarEstado('Guardando…');
     else if (envio.length) mostrarEstado(ultimoTxt || 'Guardado');
@@ -422,11 +430,15 @@ function sincronizar(opts) {
       sincronizar({ boton: siguiente });
       return;
     }
+    if (recargaPendiente) { recargaPendiente = false; otraVez = false; sincronizar(); return; }
     if (resto.length || otraVez) { otraVez = false; programarSync(); }
   }, function (err) {
+    if (yo.cancelado) return;  // la cortó ↻: ya va otra en camino
+    vuelo = null;
     enVuelo = false;
     corriendoBoton = false;
     otraVez = false;
+    recargaPendiente = false;
     var botonPerdido = botonEnEspera;
     botonEnEspera = null;
     $('contenido').classList.remove('viejo');
@@ -451,6 +463,24 @@ function sincronizar(opts) {
     else if (botonPerdido) mostrarEstado('Sin conexión: el botón no se ejecutó.', true);
     if (!E) $('cargando').textContent = 'No se pudo cargar. Toca ↻ para reintentar.';
   });
+}
+
+// Botón ↻: siempre hace caso al primer toque.
+// - Si va en camino una actualización sin cambios ni botón, la corta y pide una nueva.
+// - Si va en camino algo que no se puede cortar (cambios o un botón), queda anotada y corre al terminar.
+function recargarManual() {
+  if (enVuelo && vuelo && vuelo.cancelable) {
+    vuelo.cancelado = true;
+    if (vuelo.ctrl) vuelo.ctrl.abort();
+    vuelo = null;
+    enVuelo = false;
+  }
+  if (enVuelo) {
+    recargaPendiente = true;
+    if (!corriendoBoton) mostrarEstado('Actualizando…');
+    return;
+  }
+  sincronizar();
 }
 
 function marcarSinSenal() {
@@ -971,7 +1001,7 @@ function guardarConf() {
 
 /* ==================== EVENTOS ==================== */
 
-$('recargar').addEventListener('click', function () { if (!enVuelo) sincronizar(); });
+$('recargar').addEventListener('click', recargarManual);
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
 $('peditar').addEventListener('click', editarHabito);
