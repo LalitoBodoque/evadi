@@ -26,6 +26,8 @@ button,input,select{font-family:inherit;color:inherit}
 .ley{font-size:12px;display:flex;flex-wrap:wrap;justify-content:center;row-gap:2px;column-gap:6px;min-width:0;color:var(--texto2)}
 .ley i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:2px}
 .recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer;display:grid;place-items:center;padding:0;color:var(--texto);text-decoration:none;flex:none}
+.conb{position:relative}
+.recarga.lado{position:absolute;right:0;top:50%;transform:translateY(-50%);width:28px;height:28px;font-weight:400}
 .pm{display:flex;align-items:center;gap:10px;border-radius:var(--radio);padding:0 8px;height:48px}
 .prop{background:var(--azul);color:#FFE27A;font-weight:700;font-size:16px;line-height:1.45;text-align:center;border-radius:10px;padding:12px 14px}
 .esc{display:flex;flex-direction:column;gap:10px}
@@ -87,7 +89,6 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
     <span id="titulo" style="font-size:19px;font-weight:600;white-space:nowrap">EvaDí <span id="fecha" style="font-size:15px;font-weight:500"></span></span>
     <span class="sm ley"><span><i class="pe"></i>Pend.</span><span><i class="ok"></i>Hecho</span><span><i class="ko"></i>Fallé</span></span>
     <span style="display:flex;gap:6px;flex:none">
-      <a class="recarga" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a>
       <button class="recarga" id="recargar" aria-label="Recargar">↻</button>
     </span>
   </div>
@@ -124,9 +125,9 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <input id="pchk" type="checkbox" class="cb h" aria-label="Agendar ProMe de hoy">
       <button id="ptxt" class="pmt" aria-label="Ver escalera de ProMe"></button>
     </div>
-    <div class="ttl" id="thab">Hábitos de hoy</div>
+    <div class="ttl conb"><span id="thab">Hábitos de hoy</span><a class="recarga lado" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a></div>
     <div id="habs" class="grid2" style="gap:5px"></div>
-    <div class="ttl">Meta de todos: ≥ 90 %</div>
+    <div class="ttl conb"><span>Meta de todos: ≥ 90 %</span><a class="recarga lado" id="abrirCal" href="https://calendar.google.com/calendar/r/day" target="_blank" rel="noopener" aria-label="Abrir CalenGoo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="11.5" rx="1.5"/><path d="M1.75 6.5h12.5M5 1v3.5M11 1v3.5"/><path d="M4.5 9.25h2M9.5 9.25h2M4.5 11.75h2" stroke-width="1.6"/></svg></a></div>
     <div class="grid4">
       <div class="tl" id="m1" style="padding:4px"><div class="sm">Háb. mes</div><div style="font-size:17px;font-weight:600"></div></div>
       <div class="tl" id="m2" style="padding:4px"><div class="sm">Tiem. mes</div><div style="font-size:17px;font-weight:600"></div></div>
@@ -1002,6 +1003,25 @@ function guardarConf() {
 /* ==================== EVENTOS ==================== */
 
 $('recargar').addEventListener('click', recargarManual);
+// Botón de calendario: en Android abre CalenGoo; en la PC (no hay CalenGoo) abre Google Calendar en el navegador
+if (/Android/i.test(navigator.userAgent)) {
+  var aCal = $('abrirCal');
+  aCal.href = 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.calengoo.android;S.browser_fallback_url=' +
+    encodeURIComponent('https://calendar.google.com/calendar/r/day') + ';end';
+  aCal.removeAttribute('target');
+}
+// Botones de tabla y calendario: la línea de abajo dice qué se está abriendo (azul) y luego que ya se abrió (verde)
+function avisarAbrir(nombre) {
+  var trabajando = 'Abriendo ' + nombre + '…';
+  mostrarEstado(trabajando);
+  setTimeout(function () {
+    if ($('estado').textContent === trabajando) mostrarEstado('Se abrió ' + nombre);
+  }, 1500);
+}
+$('abrirDep').addEventListener('click', function () { avisarAbrir('DEP 3.0 en Cal'); });
+$('abrirCal').addEventListener('click', function () {
+  avisarAbrir(/Android/i.test(navigator.userAgent) ? 'CalenGoo' : 'Google Calendar');
+});
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
 $('peditar').addEventListener('click', editarHabito);
