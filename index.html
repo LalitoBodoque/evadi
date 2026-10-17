@@ -125,9 +125,9 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <input id="pchk" type="checkbox" class="cb h" aria-label="Agendar ProMe de hoy">
       <button id="ptxt" class="pmt" aria-label="Ver escalera de ProMe"></button>
     </div>
-    <div class="ttl conb"><span id="thab">Hábitos de hoy</span><a class="recarga lado" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a></div>
+    <div class="ttl" id="thab">Hábitos de hoy</div>
     <div id="habs" class="grid2" style="gap:5px"></div>
-    <div class="ttl conb"><span>Meta de todos: ≥ 90 %</span><a class="recarga lado" id="abrirCal" href="https://calendar.google.com/calendar/r/day" target="_blank" rel="noopener" aria-label="Abrir CalenGoo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="11.5" rx="1.5"/><path d="M1.75 6.5h12.5M5 1v3.5M11 1v3.5"/><path d="M4.5 9.25h2M9.5 9.25h2M4.5 11.75h2" stroke-width="1.6"/></svg></a></div>
+    <div class="ttl conb"><span>Meta de todos: ≥ 90 %</span><a class="recarga lado" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a></div>
     <div class="grid4">
       <div class="tl" id="m1" style="padding:4px"><div class="sm">Háb. mes</div><div style="font-size:17px;font-weight:600"></div></div>
       <div class="tl" id="m2" style="padding:4px"><div class="sm">Tiem. mes</div><div style="font-size:17px;font-weight:600"></div></div>
@@ -713,8 +713,8 @@ function pintarControles() {
   colocarBotones();
 }
 
-// Botones de tabla y calendario: al centro de la columna derecha de los hábitos (lejos de las casillas).
-// Si el título es largo ("· ya evaluado", "Hábitos del miércoles 14"), se recorren a la derecha para no taparlo.
+// Botón de tabla (junto a "Meta de todos"): al centro de la columna derecha, lejos de las casillas.
+// Si el texto llega hasta ahí, se recorre a la derecha lo justo para no taparlo.
 function colocarBotones() {
   document.querySelectorAll('.ttl.conb').forEach(function (t) {
     var txt = t.firstElementChild, b = t.querySelector('.lado');
@@ -1021,15 +1021,7 @@ function guardarConf() {
 /* ==================== EVENTOS ==================== */
 
 $('recargar').addEventListener('click', recargarManual);
-// Botón de calendario: en Android abre CalenGoo con su enlace propio (calengoo://); en la PC (no hay CalenGoo) abre Google Calendar en el navegador.
-// En Android ya no hay "plan B" a Google Calendar: si CalenGoo no abre, la línea de abajo lo dice (antes se abría Google Calendar dentro de EvaDí).
-var ES_ANDROID = /Android/i.test(navigator.userAgent);
-if (ES_ANDROID) {
-  var aCal = $('abrirCal');
-  aCal.href = 'calengoo://';
-  aCal.removeAttribute('target');
-}
-// Botones de tabla y calendario: la línea de abajo dice qué se está abriendo (azul) y luego que ya se abrió (verde)
+// Botón de tabla: la línea de abajo dice qué se está abriendo (azul) y luego que ya se abrió (verde)
 function avisarAbrir(nombre) {
   var trabajando = 'Abriendo ' + nombre + '…';
   mostrarEstado(trabajando);
@@ -1038,23 +1030,6 @@ function avisarAbrir(nombre) {
   }, 1500);
 }
 $('abrirDep').addEventListener('click', function () { avisarAbrir('DEP 3.0 en Cal'); });
-$('abrirCal').addEventListener('click', function () {
-  if (!ES_ANDROID) { avisarAbrir('Google Calendar'); return; }
-  // En el cel: si EvaDí se va a segundo plano, CalenGoo sí abrió; si sigue al frente después de 1.5 s, no abrió
-  var trabajando = 'Abriendo CalenGoo…';
-  var salio = false;
-  function seFue() { salio = true; }
-  document.addEventListener('visibilitychange', seFue);
-  window.addEventListener('blur', seFue);
-  mostrarEstado(trabajando);
-  setTimeout(function () {
-    document.removeEventListener('visibilitychange', seFue);
-    window.removeEventListener('blur', seFue);
-    if ($('estado').textContent !== trabajando) return;
-    if (salio) mostrarEstado('Se abrió CalenGoo');
-    else mostrarEstado('No se pudo abrir CalenGoo', true);
-  }, 1500);
-});
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
 $('peditar').addEventListener('click', editarHabito);
