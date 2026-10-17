@@ -27,7 +27,7 @@ button,input,select{font-family:inherit;color:inherit}
 .ley i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:2px}
 .recarga{border:1px solid var(--borde-fondo);background:var(--blanco);border-radius:var(--radio);width:32px;height:32px;font-size:16px;cursor:pointer;display:grid;place-items:center;padding:0;color:var(--texto);text-decoration:none;flex:none}
 .conb{position:relative}
-.recarga.lado{position:absolute;right:0;top:50%;transform:translateY(-50%);width:28px;height:28px;font-weight:400}
+.recarga.lado{position:absolute;right:calc((100% - 5px) / 4 - 14px);top:50%;transform:translateY(-50%);width:28px;height:28px;font-weight:400}
 .pm{display:flex;align-items:center;gap:10px;border-radius:var(--radio);padding:0 8px;height:48px}
 .prop{background:var(--azul);color:#FFE27A;font-weight:700;font-size:16px;line-height:1.45;text-align:center;border-radius:10px;padding:12px 14px}
 .esc{display:flex;flex-direction:column;gap:10px}
@@ -710,7 +710,25 @@ function pintarControles() {
   var th = $('thab');
   th.textContent = ev ? 'Hábitos de hoy · ya evaluado' : (ayr ? 'Hábitos del ' + E.ayer.texto : 'Hábitos de hoy');
   th.style.color = ev ? 'var(--ok-tx)' : '';
+  colocarBotones();
 }
+
+// Botones de tabla y calendario: al centro de la columna derecha de los hábitos (lejos de las casillas).
+// Si el título es largo ("· ya evaluado", "Hábitos del miércoles 14"), se recorren a la derecha para no taparlo.
+function colocarBotones() {
+  document.querySelectorAll('.ttl.conb').forEach(function (t) {
+    var txt = t.firstElementChild, b = t.querySelector('.lado');
+    var w = t.clientWidth, bw = b.offsetWidth;
+    if (!w || !bw) return;  // todavía no se ve
+    var centro = w - (w - 5) / 4;  // centro de la columna derecha (rejilla de 2 con 5 px entre columnas)
+    var izq = Math.max(centro - bw / 2, txt.offsetLeft + txt.offsetWidth + 6);
+    b.style.left = Math.min(izq, w - bw) + 'px';
+    b.style.right = 'auto';
+  });
+}
+window.addEventListener('resize', colocarBotones);
+// También cuando cambia el ancho sin cambiar la ventana (por ejemplo, al salir o quitarse la barra de scroll)
+if (window.ResizeObserver) new ResizeObserver(colocarBotones).observe($('contenido'));
 
 // Franja del día anterior sin evaluar: lo que se ve en pantalla todavía es de ese día
 function pintarAyer() {
@@ -1003,11 +1021,12 @@ function guardarConf() {
 /* ==================== EVENTOS ==================== */
 
 $('recargar').addEventListener('click', recargarManual);
-// Botón de calendario: en Android abre CalenGoo; en la PC (no hay CalenGoo) abre Google Calendar en el navegador
-if (/Android/i.test(navigator.userAgent)) {
+// Botón de calendario: en Android abre CalenGoo con su enlace propio (calengoo://); en la PC (no hay CalenGoo) abre Google Calendar en el navegador.
+// En Android ya no hay "plan B" a Google Calendar: si CalenGoo no abre, la línea de abajo lo dice (antes se abría Google Calendar dentro de EvaDí).
+var ES_ANDROID = /Android/i.test(navigator.userAgent);
+if (ES_ANDROID) {
   var aCal = $('abrirCal');
-  aCal.href = 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.calengoo.android;S.browser_fallback_url=' +
-    encodeURIComponent('https://calendar.google.com/calendar/r/day') + ';end';
+  aCal.href = 'calengoo://';
   aCal.removeAttribute('target');
 }
 // Botones de tabla y calendario: la línea de abajo dice qué se está abriendo (azul) y luego que ya se abrió (verde)
@@ -1020,7 +1039,21 @@ function avisarAbrir(nombre) {
 }
 $('abrirDep').addEventListener('click', function () { avisarAbrir('DEP 3.0 en Cal'); });
 $('abrirCal').addEventListener('click', function () {
-  avisarAbrir(/Android/i.test(navigator.userAgent) ? 'CalenGoo' : 'Google Calendar');
+  if (!ES_ANDROID) { avisarAbrir('Google Calendar'); return; }
+  // En el cel: si EvaDí se va a segundo plano, CalenGoo sí abrió; si sigue al frente después de 1.5 s, no abrió
+  var trabajando = 'Abriendo CalenGoo…';
+  var salio = false;
+  function seFue() { salio = true; }
+  document.addEventListener('visibilitychange', seFue);
+  window.addEventListener('blur', seFue);
+  mostrarEstado(trabajando);
+  setTimeout(function () {
+    document.removeEventListener('visibilitychange', seFue);
+    window.removeEventListener('blur', seFue);
+    if ($('estado').textContent !== trabajando) return;
+    if (salio) mostrarEstado('Se abrió CalenGoo');
+    else mostrarEstado('No se pudo abrir CalenGoo', true);
+  }, 1500);
 });
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
