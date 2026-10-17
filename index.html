@@ -125,7 +125,7 @@ select{height:44px;font-size:15px;border:1px solid #B4B2A9;border-radius:var(--r
       <input id="pchk" type="checkbox" class="cb h" aria-label="Agendar ProMe de hoy">
       <button id="ptxt" class="pmt" aria-label="Ver escalera de ProMe"></button>
     </div>
-    <div class="ttl" id="thab">Hábitos de hoy</div>
+    <div class="ttl conb"><span id="thab">Hábitos de hoy</span><button class="recarga lado" id="abrirCalengoo" style="display:none" aria-label="Abrir CalenGoo"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="11.5" rx="1.5"/><path d="M1.75 6.5h12.5M5 1v3.5M11 1v3.5"/></svg></button></div>
     <div id="habs" class="grid2" style="gap:5px"></div>
     <div class="ttl conb"><span>Meta de todos: ≥ 90 %</span><a class="recarga lado" id="abrirDep" href="https://docs.google.com/spreadsheets/d/1CL6RYyW0V0MCGk7Xf6ASw2FyuF9Qi6V6ZHnfN_0UEzY/edit#gid=0" target="_blank" rel="noopener" aria-label="Abrir DEP 3.0"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="1.75" width="12.5" height="12.5" rx="1.5"/><path d="M1.75 6h12.5M1.75 10h12.5M6 6v8.25"/></svg></a></div>
     <div class="grid4">
@@ -713,7 +713,7 @@ function pintarControles() {
   colocarBotones();
 }
 
-// Botón de tabla (junto a "Meta de todos"): al centro de la columna derecha, lejos de las casillas.
+// Botones de tabla (junto a "Meta de todos") y CalenGoo (junto a "Hábitos de hoy"): al centro de la columna derecha, lejos de las casillas.
 // Si el texto llega hasta ahí, se recorre a la derecha lo justo para no taparlo.
 function colocarBotones() {
   document.querySelectorAll('.ttl.conb').forEach(function (t) {
@@ -1030,6 +1030,26 @@ function avisarAbrir(nombre) {
   }, 1500);
 }
 $('abrirDep').addEventListener('click', function () { avisarAbrir('DEP 3.0 en Cal'); });
+
+// Botón CalenGoo (solo en el cel con Android): le avisa a Tasker, que escucha en el mismo cel y abre CalenGoo.
+// Tasker: perfil "Solicitud HTTP" puerto 1821, GET, ruta /calengoo, respuesta rápida "ok" → tarea Iniciar Aplicación CalenGoo.
+// En la PC no sale (ahí no hay Tasker).
+var TASKER_CALENGOO = 'http://127.0.0.1:1821/calengoo';
+if (/Android/i.test(navigator.userAgent)) $('abrirCalengoo').style.display = '';
+$('abrirCalengoo').addEventListener('click', function () {
+  var trabajando = 'Abriendo CalenGoo…';
+  mostrarEstado(trabajando);
+  var ctrl = window.AbortController ? new AbortController() : null;
+  var reloj = setTimeout(function () { if (ctrl) ctrl.abort(); }, 4000);
+  fetch(TASKER_CALENGOO, { mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+    .then(function () {
+      if ($('estado').textContent === trabajando) mostrarEstado('Se abrió CalenGoo');
+    })
+    .catch(function () {
+      if ($('estado').textContent === trabajando) mostrarEstado('Tasker no respondió: revisa que esté encendido', true);
+    })
+    .then(function () { clearTimeout(reloj); });
+});
 $('titulo').addEventListener('click', function () { abrirConf(); });
 $('ptxt').addEventListener('click', abrirProMe);
 $('peditar').addEventListener('click', editarHabito);
