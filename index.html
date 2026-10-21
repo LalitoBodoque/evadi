@@ -609,7 +609,8 @@ function pintarResumen() {
   [['m1', E.mes.habitos], ['m2', E.mes.tiempo], ['m3', E.mes.total], ['m4', E.mes.global]].forEach(function (p) {
     var el = $(p[0]);
     el.children[1].textContent = pct(p[1]);
-    est(el, p[1] >= 0.9 ? 'ok' : 'pe');
+    // El color usa el mismo número redondeado que se ve (89.6 % se ve 90 % y va en verde)
+    est(el, Math.round(p[1] * 100) >= 90 ? 'ok' : 'pe');
   });
 }
 

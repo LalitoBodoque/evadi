@@ -6,7 +6,7 @@
  * IMPORTANTE: cada vez que cambies cualquier archivo en GitHub, sube VERSION
  * (evadi-v2, evadi-v3...). Sin ese cambio no aparece el aviso de "Hay versión nueva".
  */
-var VERSION = 'evadi-v31';
+var VERSION = 'evadi-v32';
 
 var ARCHIVOS = [
   './',
