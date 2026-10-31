@@ -27,7 +27,8 @@
  *   le pone X; si le quitas el [C], o si el evento vuelve a aparecer hoy, regresa a pendiente.
  *   Los hábitos de EVADIAPP_HAB_AL_REVES (hoy ninguno) funcionan al revés: borrar = X; si vuelve = pendiente.
  * - Link del Rosario (para el documento donde se reza): doGet con ?accion=rosario&t=<contraseña del link>.
- *   Pide confirmar con un botón; al confirmar borra el evento del Rosario de HOY en "🧕 Hábitos"
+ *   Pide confirmar con un botón (caduca a los 10 min, así una pestaña recargada no marca nada);
+ *   al confirmar borra el evento del Rosario de HOY en "🧕 Hábitos"
  *   y palomea el Rosario en EvaDi (o en Cal si el día ya se evaluó). La contraseña del link es aparte
  *   de la clave de la app (EVADI_ROSARIO_TOKEN) y solo sirve para esto.
  * - Día anterior sin evaluar: si ayer no se evaluó (su W en Cal está vacío) y hoy tampoco,
@@ -214,16 +215,23 @@ function evadiApp_rosarioTokenValido_(t) {
  * Abre el link del Rosario.
  * Sin ok=1: muestra el botón para confirmar (así una vista previa del link no marca nada).
  * Con ok=1: borra el evento de hoy y palomea el Rosario.
+ * El botón lleva la hora en que se mostró (ts). Si la página "Rosario hecho" se recarga después
+ * (Chrome reabre pestañas viejas), el ok=1 ya caducó y solo vuelve a preguntar: no borra nada.
  */
+var EVADIAPP_ROSARIO_CADUCA_MIN = 10;  // minutos que dura el botón "Sí, marcar hecho"
+
 function evadiApp_rosarioGet_(p) {
   var t = String(p.t || '');
   if (!evadiApp_rosarioTokenValido_(t)) {
     return evadiApp_pagina_('Link no válido', '<p>Este link ya no sirve. Crea uno nuevo con evadiAppCrearLinkRosario.</p>', false);
   }
 
-  if (p.ok !== '1') {
-    var url = ScriptApp.getService().getUrl() + '?accion=rosario&t=' + encodeURIComponent(t) + '&ok=1';
+  var ts = Number(p.ts || 0);
+  var vigente = ts > 0 && (Date.now() - ts) >= 0 && (Date.now() - ts) <= EVADIAPP_ROSARIO_CADUCA_MIN * 60000;
+  if (p.ok !== '1' || !vigente) {
+    var url = ScriptApp.getService().getUrl() + '?accion=rosario&t=' + encodeURIComponent(t) + '&ok=1&ts=' + Date.now();
     return evadiApp_pagina_('Rosario',
+      (p.ok === '1' ? '<p>Esta página se volvió a abrir sola o ya pasó un rato: no se marcó nada.</p>' : '') +
       '<p>¿Ya terminaron el Rosario?</p>' +
       '<a class="btn" href="' + url + '" target="_top">Sí, marcar hecho</a>', false);
   }
