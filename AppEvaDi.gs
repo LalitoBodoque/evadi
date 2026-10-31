@@ -38,6 +38,9 @@
  *   Si lo resuelves de las 5:00 en adelante, la app vuelve a leer tu calendario de hoy (como Check hábitos).
  * - Evaluar desde la casilla M18 de la hoja pasa por aquí (evadiAppEvaluarDesdeHoja): mismo candado y mismas reglas.
  * - Exentar también quita las X de los hábitos que quedan palomeados.
+ * - Cierre del mes (evadiAppCerrarMes, disparador los días 1 y 2 a las 5:00): copia de Cal
+ *   a Glob el % de hábitos (L) y de tiempo (V) de ese mes como números fijos, con tope de 110%.
+ *   Espera a que el último día del mes esté evaluado o descartado. Nunca pisa lo que ya esté en Glob.
  * - ProMe: el evento vive en "🧕 Hábitos" con el ícono ❗ y color morado (EventosProMe.gs) y cuenta como el hábito "❗ Hacer ProMe".
  *   El ícono es lo que lo identifica (la etiqueta [wpro] ya no se usa; solo se reconoce en eventos viejos).
  *   Registro en la hoja oculta "ProMeLog" (Fecha | ProMe | Resultado | Hora) para la sesión semanal:
@@ -2021,4 +2024,174 @@ function evadiApp_ymd_(a, b) {
   var ancla = Date.UTC(anioAncla, mesAncla, Math.min(pa[2], ultimoDia));
   var dias = Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - ancla) / 86400000);
   return { a: Math.floor(total / 12), m: total % 12, d: dias };
+}
+/* ==================== CIERRE DEL MES (Glob) ==================== */
+// Los días 1 y 2 de cada mes (5:00 a 6:00) revisa si el mes pasado ya está en Glob. Si falta, lo copia de Cal:
+// % de hábitos (columna L del renglón de totales) y % de tiempo (columna V), con tope de 110%,
+// redondeados a 2 decimales (como los escribías a mano). Nunca pisa un valor que ya esté en Glob.
+// Espera a que el último día del mes esté evaluado (o descartado). Si no lo resolviste,
+// el día 1 no copia y el día 2 copia con lo que haya. El día 1 no copia antes de las 5:00 (EVADIAPP_CORTE).
+
+var EVADIAPP_HOJA_GLOB = 'Glob';
+var EVADIAPP_GLOB = { colAnio: 2, colMes: 3, colHab: 4, colTiempo: 5 };  // B = Año, C = Mes, D = Hábitos, E = Tiempo
+var EVADIAPP_CAL_TOTALES = [34, 65, 98, 130, 163, 195, 228, 261, 293, 326, 358, 391];  // renglón de totales de cada mes en Cal
+var EVADIAPP_TOPE_MES = 1.1;  // 110%
+
+/**
+ * Córrela UNA vez desde el editor: crea los disparadores del día 1 y del día 2 de cada mes, de 5:00 a 6:00
+ * (borra los viejos de esta función si existían).
+ * Día 1: copia si el último día del mes ya está evaluado o descartado.
+ * Día 2: copia con lo que haya si el día 1 no pudo.
+ */
+function evadiAppInstalarCierreMes() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'evadiAppCerrarMes') ScriptApp.deleteTrigger(t);
+  });
+  var tz = evadiApp_libro_().getSpreadsheetTimeZone();
+  [1, 2].forEach(function (dia) {
+    ScriptApp.newTrigger('evadiAppCerrarMes').timeBased()
+      .onMonthDay(dia).atHour(EVADIAPP_CORTE).inTimezone(tz).create();
+  });
+  Logger.log('Listo: disparadores de los días 1 y 2 a las ' + EVADIAPP_CORTE + ':00 creados. Revisión de hoy: ' + evadiAppCerrarMes());
+}
+
+/**
+ * La corren los disparadores de los días 1 y 2. También se puede correr a mano.
+ */
+function evadiAppCerrarMes() {
+  var candado = LockService.getScriptLock();
+  if (!candado.tryLock(20000)) return 'Ocupado: corre evadiAppCerrarMes a mano en un rato.';
+  var r;
+  try {
+    r = evadiApp_cierreMes_(evadiApp_libro_(), true);
+  } finally {
+    candado.releaseLock();
+  }
+  Logger.log(r);
+  return r;
+}
+
+/**
+ * Prueba manual: dice qué escribiría para el mes pasado, sin escribir nada.
+ */
+function evadiAppProbarCierreMes() {
+  Logger.log(evadiApp_cierreMes_(evadiApp_libro_(), false));
+}
+
+/**
+ * Copia el mes pasado de Cal a Glob. escribir = false solo informa.
+ */
+function evadiApp_cierreMes_(ss, escribir) {
+  var tz = ss.getSpreadsheetTimeZone();
+  var hoy = evadiApp_hoy_(ss).split('-').map(Number);  // [aaaa, mm, dd]
+  var hora = Number(Utilities.formatDate(new Date(), tz, 'H'));
+  var anio = hoy[1] === 1 ? hoy[0] - 1 : hoy[0];
+  var mes = hoy[1] === 1 ? 12 : hoy[1] - 1;  // 1-12
+  var nombre = EVADIAPP_MESES[mes - 1];
+  var etiqueta = nombre + ' ' + anio;
+  var G = EVADIAPP_GLOB;
+
+  // 1) ¿Ya está en Glob?
+  var glob = ss.getSheetByName(EVADIAPP_HOJA_GLOB);
+  if (!glob) return 'No encontré la hoja Glob.';
+  var filaGlob = evadiApp_globFila_(glob, anio, mes, false);
+  var actuales = filaGlob ? glob.getRange(filaGlob, G.colHab, 1, 2).getValues()[0] : ['', ''];
+  var faltaHab = actuales[0] === '' || actuales[0] === null;
+  var faltaTiempo = actuales[1] === '' || actuales[1] === null;
+  if (escribir && !faltaHab && !faltaTiempo) return etiqueta + ' ya está en Glob.';
+
+  // 2) Datos del mes en Cal
+  var cal = ss.getSheetByName(EVADIAPP.hojaCal);
+  if (!cal) return 'No encontré la hoja Cal.';
+  var total = EVADIAPP_CAL_TOTALES[mes - 1];
+  var renglonTotal = cal.getRange(total, 1, 1, 25).getValues()[0];  // A:Y
+  // Seguro: el renglón de totales dice "Resumen <mes>" en la columna Y
+  if (evadiApp_normal_(renglonTotal[24]).indexOf(nombre) < 0) {
+    return 'Cal!Y' + total + ' no dice "' + nombre + '": no copio nada (¿se movieron los renglones?).';
+  }
+  var hab = renglonTotal[11];     // L
+  var tiempo = renglonTotal[21];  // V
+  if (typeof hab !== 'number' || !isFinite(hab) || typeof tiempo !== 'number' || !isFinite(tiempo)) {
+    return 'Cal!L' + total + ' o Cal!V' + total + ' no tienen número: no copio nada.';
+  }
+
+  // Días del mes (se buscan por su texto en A; febrero trae el renglón del 29 aunque no sea bisiesto)
+  var desde = Math.max(1, total - 31);
+  var dias = cal.getRange(desde, 1, total - desde, 23).getValues();  // A:W
+  var ultimo = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+  var etiqUltimo = (ultimo < 10 ? '0' : '') + ultimo + '-' + nombre;
+  var patron = new RegExp('^\\d{2}-' + nombre + '$');
+  var evaluados = 0, ultimoEvaluado = false;
+  dias.forEach(function (d) {
+    var a = evadiApp_normal_(d[0]);
+    if (!patron.test(a)) return;
+    var conW = d[22] !== '' && d[22] !== null;
+    if (conW) evaluados++;
+    if (a === etiqUltimo && conW) ultimoEvaluado = true;
+  });
+  if (evaluados === 0) return 'Cal no tiene días evaluados de ' + etiqueta + ' (¿ya se reinició para el año nuevo?). No copio nada.';
+
+  // 3) ¿Ya cerró el mes?
+  var fechaUltimo = anio + '-' + (mes < 10 ? '0' : '') + mes + '-' + (ultimo < 10 ? '0' : '') + ultimo;
+  var descartado = PropertiesService.getScriptProperties().getProperty(EVADIAPP_PROP_DESCARTADO) === fechaUltimo;
+  var habFinal = Math.round(Math.min(hab, EVADIAPP_TOPE_MES) * 100) / 100;
+  var tiempoFinal = Math.round(Math.min(tiempo, EVADIAPP_TOPE_MES) * 100) / 100;
+  var resumen = 'hábitos ' + Math.round(habFinal * 100) + '%, tiempo ' + Math.round(tiempoFinal * 100) + '%';
+
+  if (!escribir) {
+    return 'Prueba ' + etiqueta + ': Cal dice ' + resumen +
+      ' (sin tope: ' + Math.round(hab * 100) + '% / ' + Math.round(tiempo * 100) + '%). ' +
+      'Glob tiene: ' + (faltaHab ? 'vacío' : actuales[0]) + ' / ' + (faltaTiempo ? 'vacío' : actuales[1]) + '. ' +
+      'Último día ' + (ultimoEvaluado ? 'evaluado' : (descartado ? 'descartado' : 'sin evaluar')) + '. ' +
+      (filaGlob ? 'Renglón ' + filaGlob + ' de Glob.' : 'Se crearía el bloque del ' + anio + ' en Glob.');
+  }
+  if (hoy[2] === 1 && hora < EVADIAPP_CORTE) return 'Esperando a las ' + EVADIAPP_CORTE + ':00 para cerrar ' + etiqueta + '.';
+  if (!ultimoEvaluado && !descartado && hoy[2] < 2) return 'Esperando: el ' + ultimo + ' de ' + nombre + ' sigue sin evaluar.';
+
+  // 4) Escribir solo lo que falta
+  if (!filaGlob) filaGlob = evadiApp_globFila_(glob, anio, mes, true);
+  if (!filaGlob) return 'No encontré ni pude crear el renglón de ' + etiqueta + ' en Glob.';
+  if (faltaHab) glob.getRange(filaGlob, G.colHab).setValue(habFinal);
+  if (faltaTiempo) glob.getRange(filaGlob, G.colTiempo).setValue(tiempoFinal);
+  SpreadsheetApp.flush();
+  evadiApp_subirVer_();  // la app se actualiza (el % global sale de Glob)
+  return 'Se copió ' + etiqueta + ' a Glob: ' + resumen + '.';
+}
+
+/**
+ * Renglón de Glob para un año y mes (1-12). 0 si no existe.
+ * crear = true: si el año no tiene bloque, lo agrega abajo (un renglón vacío, el año en B y los 12 meses en C)
+ * con el formato del bloque del año anterior.
+ */
+function evadiApp_globFila_(glob, anio, mes, crear) {
+  var G = EVADIAPP_GLOB;
+  var ult = Math.max(glob.getLastRow(), 1);
+  var datos = glob.getRange(1, G.colAnio, ult, 2).getValues();  // B:C
+  var inicio = -1, inicioAnt = -1;
+  for (var i = 0; i < datos.length; i++) {
+    var v = datos[i][0];
+    if (v === '' || v === null) continue;
+    if (Number(v) === anio) inicio = i;
+    if (Number(v) === anio - 1) inicioAnt = i;
+  }
+
+  if (inicio < 0) {
+    if (!crear) return 0;
+    var filaNueva = ult + 2;
+    var valores = EVADIAPP_MESES.map(function (m, k) {
+      return [k === 0 ? anio : '', m.charAt(0).toUpperCase() + m.slice(1)];
+    });
+    if (inicioAnt >= 0) {
+      glob.getRange(inicioAnt + 1, G.colAnio, 12, G.colTiempo - G.colAnio + 1)
+        .copyFormatToRange(glob, G.colAnio, G.colTiempo, filaNueva, filaNueva + 11);
+    }
+    glob.getRange(filaNueva, G.colAnio, 12, 2).setValues(valores);
+    return filaNueva + mes - 1;
+  }
+
+  var nombre = EVADIAPP_MESES[mes - 1];
+  for (var j = inicio; j < Math.min(inicio + 12, datos.length); j++) {
+    if (evadiApp_normal_(datos[j][1]) === nombre) return j + 1;
+  }
+  return 0;
 }
